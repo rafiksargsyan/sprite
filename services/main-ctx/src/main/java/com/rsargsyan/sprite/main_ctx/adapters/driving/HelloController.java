@@ -1,4 +1,4 @@
-package com.rsargsyan.sprite.main_ctx.adapters;
+package com.rsargsyan.sprite.main_ctx.adapters.driving;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
