@@ -2,16 +2,34 @@ package com.rsargsyan.sprite.main_ctx.core.domain.aggregate;
 
 import io.hypersistence.tsid.TSID;
 import io.hypersistence.utils.hibernate.id.Tsid;
-import jakarta.persistence.Id;
-import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.*;
+import lombok.Getter;
+
+import java.time.Instant;
 
 @MappedSuperclass
 public abstract class AggregateRoot {
   @Id
   @Tsid
+  @Getter
   private Long id;
 
-  public String getId() {
+  @Version
+  private Long version;
+
+  @Column(name = "updated_at")
+  @Getter
+  private Instant updatedAt;
+
+  protected AggregateRoot() {
+    this.updatedAt = Instant.now();
+  }
+
+  public String getStrId() {
     return TSID.from(id).toString();
+  }
+
+  public void touch() {
+    this.updatedAt = Instant.now();
   }
 }

@@ -1,0 +1,45 @@
+package com.rsargsyan.sprite.main_ctx.core.app;
+
+import com.rsargsyan.sprite.main_ctx.Config;
+import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.ThumbnailsGenerationJob;
+import com.rsargsyan.sprite.main_ctx.core.ports.repository.ThumbnailsGenerationJobRepository;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionalEventListener;
+
+@Component
+public class ApplicationEventListener {
+  private final ThumbnailsGenerationJobRepository thumbnailsGenerationJobRepository;
+  private final RabbitTemplate rabbitTemplate;
+  private final Config.Receiver receiver;
+  private final Config config;
+
+  @Autowired
+  public ApplicationEventListener(ThumbnailsGenerationJobRepository thumbnailsGenerationJobRepository,
+                                  Config.Receiver receiver, RabbitTemplate rabbitTemplate, Config config) {
+    this.thumbnailsGenerationJobRepository = thumbnailsGenerationJobRepository;
+    this.receiver = receiver;
+    this.rabbitTemplate = rabbitTemplate;
+    this.config = config;
+  }
+
+  @Async
+  @TransactionalEventListener
+  public void handleThumbnailsGenerationJobUpsertEvent(ThumbnailsGenerationJobUpsertEvent event) {
+    thumbnailsGenerationJobRepository.findById(event.getJobId()).ifPresentOrElse(
+        job -> {
+          if (job.getStatus() == ThumbnailsGenerationJob.Status.SUBMITTED) {
+            job.queue();
+            //TODO: send to RabbitMQ
+            rabbitTemplate.convertAndSend(config.topicExchangeName, "test", "Hello from RabbitMQ!");
+            thumbnailsGenerationJobRepository.save(job);
+          }
+        },
+        () -> {
+          //TODO: log warning message that job with the id was not found
+        }
+    );
+  }
+}

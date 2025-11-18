@@ -7,10 +7,7 @@ import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.ThumbnailsGenerationJ
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/thumbnails-generation-job")
@@ -28,8 +25,14 @@ public class ThumbnailsGenerationJobController {
         @RequestBody ThumbnailsGenerationJobCreationDTO req
     ) {
         ThumbnailsGenerationJob job = thumbnailsGenerationJobService.create(req.getVideoURL());
-        return new ResponseEntity<>(new ThumbnailsGenerationJobDTO(job.getId(),
+        return new ResponseEntity<>(new ThumbnailsGenerationJobDTO(job.getStrId(),
             job.getVideoURL()), HttpStatus.CREATED);
     }
 
+    @PatchMapping("/touch/{id}")
+    public ResponseEntity<ThumbnailsGenerationJobDTO> touch(@PathVariable String id) {
+        ThumbnailsGenerationJob job = thumbnailsGenerationJobService.touch(id);
+        return new ResponseEntity<>(new ThumbnailsGenerationJobDTO(job.getStrId(), job.getVideoURL()),
+            HttpStatus.OK);
+    }
 }
