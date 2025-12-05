@@ -1,9 +1,8 @@
 package com.rsargsyan.sprite.main_ctx.adapters.driving;
 
-import com.rsargsyan.sprite.main_ctx.adapters.driving.dto.ThumbnailsGenerationJobCreationDTO;
-import com.rsargsyan.sprite.main_ctx.adapters.driving.dto.ThumbnailsGenerationJobDTO;
+import com.rsargsyan.sprite.main_ctx.core.app.dto.ThumbnailsGenerationJobCreationDTO;
+import com.rsargsyan.sprite.main_ctx.core.app.dto.ThumbnailsGenerationJobDTO;
 import com.rsargsyan.sprite.main_ctx.core.app.ThumbnailsGenerationJobService;
-import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.ThumbnailsGenerationJob;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,15 +23,13 @@ public class ThumbnailsGenerationJobController {
     public ResponseEntity<ThumbnailsGenerationJobDTO> createThumbnailsGenerationJob(
         @RequestBody ThumbnailsGenerationJobCreationDTO req
     ) {
-        ThumbnailsGenerationJob job = thumbnailsGenerationJobService.create(req.getVideoURL());
-        return new ResponseEntity<>(new ThumbnailsGenerationJobDTO(job.getStrId(),
-            job.getVideoURL()), HttpStatus.CREATED);
+        ThumbnailsGenerationJobDTO job = thumbnailsGenerationJobService.create(req.getVideoURL());
+        return new ResponseEntity<>(job, HttpStatus.CREATED);
     }
 
-    @PatchMapping("/touch/{id}")
+    @PatchMapping("/{id}/touch")
     public ResponseEntity<ThumbnailsGenerationJobDTO> touch(@PathVariable String id) {
-        ThumbnailsGenerationJob job = thumbnailsGenerationJobService.touch(id);
-        return new ResponseEntity<>(new ThumbnailsGenerationJobDTO(job.getStrId(), job.getVideoURL()),
-            HttpStatus.OK);
+        ThumbnailsGenerationJobDTO job = thumbnailsGenerationJobService.touch(id);
+        return new ResponseEntity<>(job, HttpStatus.OK);
     }
 }

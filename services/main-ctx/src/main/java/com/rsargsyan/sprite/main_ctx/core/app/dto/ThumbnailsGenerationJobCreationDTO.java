@@ -1,4 +1,4 @@
-package com.rsargsyan.sprite.main_ctx.adapters.driving.dto;
+package com.rsargsyan.sprite.main_ctx.core.app.dto;
 
 import lombok.Value;
 

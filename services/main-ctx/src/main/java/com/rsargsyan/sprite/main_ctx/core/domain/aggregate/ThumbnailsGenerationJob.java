@@ -36,7 +36,17 @@ public class ThumbnailsGenerationJob extends AggregateRoot {
       throw new RuntimeException("Must be in submitted state"); //TODO: Create custom exception
     }
     this.status = Status.QUEUED;
+    touch();
   }
+
+  public void run() {
+    if (this.status != Status.QUEUED) {
+      throw new RuntimeException("Must be in queued state");
+    }
+    this.status = Status.IN_PROGRESS;
+    touch();
+  }
+
 
   public enum Status {
     SUBMITTED,

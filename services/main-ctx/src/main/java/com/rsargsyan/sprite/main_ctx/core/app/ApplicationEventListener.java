@@ -13,14 +13,12 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class ApplicationEventListener {
   private final ThumbnailsGenerationJobRepository thumbnailsGenerationJobRepository;
   private final RabbitTemplate rabbitTemplate;
-  private final Config.Receiver receiver;
   private final Config config;
 
   @Autowired
   public ApplicationEventListener(ThumbnailsGenerationJobRepository thumbnailsGenerationJobRepository,
-                                  Config.Receiver receiver, RabbitTemplate rabbitTemplate, Config config) {
+                                  RabbitTemplate rabbitTemplate, Config config) {
     this.thumbnailsGenerationJobRepository = thumbnailsGenerationJobRepository;
-    this.receiver = receiver;
     this.rabbitTemplate = rabbitTemplate;
     this.config = config;
   }

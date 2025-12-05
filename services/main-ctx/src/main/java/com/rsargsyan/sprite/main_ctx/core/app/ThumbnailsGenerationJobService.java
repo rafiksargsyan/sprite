@@ -1,5 +1,6 @@
 package com.rsargsyan.sprite.main_ctx.core.app;
 
+import com.rsargsyan.sprite.main_ctx.core.app.dto.ThumbnailsGenerationJobDTO;
 import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.ThumbnailsGenerationJob;
 import com.rsargsyan.sprite.main_ctx.core.ports.repository.ThumbnailsGenerationJobRepository;
 import io.hypersistence.tsid.TSID;
@@ -26,21 +27,36 @@ public class ThumbnailsGenerationJobService {
   }
 
   @Transactional
-  public ThumbnailsGenerationJob create(String videoURL) {
+  public ThumbnailsGenerationJobDTO create(String videoURL) {
     ThumbnailsGenerationJob job = new ThumbnailsGenerationJob(videoURL);
     thumbnailsGenerationJobRepository.save(job);
     applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobUpsertEvent(job.getId()));
-    return job;
+    return ThumbnailsGenerationJobDTO.from(job);
   }
 
   @Transactional
-  public ThumbnailsGenerationJob touch(String id) {
+  public ThumbnailsGenerationJobDTO touch(String id) {
     Optional<ThumbnailsGenerationJob> job = thumbnailsGenerationJobRepository.findById(TSID.from(id).toLong());
     if (job.isEmpty()) {
       throw new RuntimeException("TODO"); // create custom exception
     }
     job.get().touch();
     thumbnailsGenerationJobRepository.save(job.get());
-    return job.get();
+    applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobUpsertEvent(job.get().getId()));
+    return ThumbnailsGenerationJobDTO.from(job.get());
+  }
+
+  @Transactional
+  public void run(String id) {
+    thumbnailsGenerationJobRepository.findById(TSID.from(id).toLong()).ifPresentOrElse(
+        job -> {
+          job.run();
+          thumbnailsGenerationJobRepository.save(job);
+          // applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobUpsertEvent(job.get().getId()));
+        },
+        () ->  {
+          throw new RuntimeException();
+        }
+    );
   }
 }
