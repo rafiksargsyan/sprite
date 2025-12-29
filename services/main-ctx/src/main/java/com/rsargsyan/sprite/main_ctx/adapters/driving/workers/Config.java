@@ -1,4 +1,4 @@
-package com.rsargsyan.sprite.main_ctx.adapters.driving;
+package com.rsargsyan.sprite.main_ctx.adapters.driving.workers;
 
 import com.rabbitmq.client.Channel;
 import com.rsargsyan.sprite.main_ctx.core.app.ThumbnailsGenerationJobService;

@@ -1,4 +1,4 @@
-package com.rsargsyan.sprite.main_ctx.adapters.driving;
+package com.rsargsyan.sprite.main_ctx.adapters.driving.controllers;
 
 import com.rsargsyan.sprite.main_ctx.core.app.dto.ThumbnailsGenerationJobCreationDTO;
 import com.rsargsyan.sprite.main_ctx.core.app.dto.ThumbnailsGenerationJobDTO;
