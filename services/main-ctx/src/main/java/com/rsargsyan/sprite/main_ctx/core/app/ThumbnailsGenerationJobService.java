@@ -52,7 +52,7 @@ public class ThumbnailsGenerationJobService {
         job -> {
           job.run();
           thumbnailsGenerationJobRepository.save(job);
-          // applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobUpsertEvent(job.get().getId()));
+          applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobUpsertEvent(job.getId()));
         },
         () ->  {
           throw new RuntimeException();

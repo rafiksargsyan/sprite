@@ -19,7 +19,7 @@ public class ThumbnailsGenerationJobController {
         this.thumbnailsGenerationJobService = thumbnailsGenerationJobService;
     }
 
-    @PostMapping("/")
+    @PostMapping
     public ResponseEntity<ThumbnailsGenerationJobDTO> createThumbnailsGenerationJob(
         @RequestBody ThumbnailsGenerationJobCreationDTO req
     ) {

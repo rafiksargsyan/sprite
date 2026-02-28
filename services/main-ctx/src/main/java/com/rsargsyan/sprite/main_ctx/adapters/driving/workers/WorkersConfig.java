@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 
 @Component
-public class Config {
+public class WorkersConfig {
 
   @Autowired
   private com.rsargsyan.sprite.main_ctx.Config config;
@@ -38,9 +38,10 @@ public class Config {
     public void onMessage(Message message, Channel channel) {
       System.out.println("Received <" + message + ">");
       try {
-        thumbnailsGenerationJobService.run("TODO");
+        thumbnailsGenerationJobService.run(new String(message.getBody(), "UTF-8"));
         channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
       } catch (IOException e) {
+        System.out.println(e.getMessage());
         throw new RuntimeException(e);
       }
     }
