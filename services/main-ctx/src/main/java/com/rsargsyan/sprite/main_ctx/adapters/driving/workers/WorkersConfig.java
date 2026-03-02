@@ -11,6 +11,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @Component
 public class WorkersConfig {
@@ -20,6 +24,10 @@ public class WorkersConfig {
 
   @Autowired
   private ThumbnailsGenerationJobService thumbnailsGenerationJobService;
+
+
+  private ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
   @Bean
   SimpleMessageListenerContainer container(ConnectionFactory connectionFactory,
                                            MyMessageListener listener) {
@@ -39,11 +47,17 @@ public class WorkersConfig {
       System.out.println("Received <" + message + ">");
       try {
         thumbnailsGenerationJobService.run(new String(message.getBody(), "UTF-8"));
-        channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
-      } catch (IOException e) {
-        System.out.println(e.getMessage());
+      } catch (UnsupportedEncodingException e) {
         throw new RuntimeException(e);
       }
+      // Maybe we can have multiple queues for specific duration ranges
+      executorService.schedule(() -> {
+        try {
+          channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+        } catch (IOException e) {
+          throw new RuntimeException(e); //TODO
+        }
+      }, 5, TimeUnit.MINUTES);
     }
   }
 
