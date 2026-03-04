@@ -127,7 +127,7 @@ public class ApplicationEventListener {
     S3Client s3 = config.s3Client();
 
     PutObjectRequest request = PutObjectRequest.builder()
-        .bucket("sprite-rsargsyan")
+        .bucket(config.s3Bucket)
         .key("thumbnails-zip.zip")
         .contentType("application/zip")
         .build();

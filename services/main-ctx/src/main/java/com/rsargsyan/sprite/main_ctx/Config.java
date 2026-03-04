@@ -18,18 +18,33 @@ public class Config {
   @Value("${rabbitmq.topic.exchange.name}")
   public String topicExchangeName;
 
+  @Value("${s3.access-key-id}")
+  public String s3AccessKeyId;
+
+  @Value("${s3.secret-access-key}")
+  public String s3SecretAccessKey;
+
+  @Value("${s3.region}")
+  public String s3Region;
+
+  @Value("${s3.endpoint}")
+  public String s3Endpoint;
+
+  @Value("${s3.bucket")
+  public String s3Bucket;
+
   @Bean
   public S3Client s3Client() {
 
     AwsBasicCredentials credentials =
         AwsBasicCredentials.create(
-            "todo",
-            "todo"
+            s3AccessKeyId,
+            s3SecretAccessKey
         );
 
     return S3Client.builder()
-        .endpointOverride(URI.create("https://s3.eu-central-003.backblazeb2.com")) // required for S3-compatible
-        .region(Region.of("eu-central-003"))
+        .endpointOverride(URI.create(s3Endpoint))
+        .region(Region.of(s3Region))
         .credentialsProvider(
             StaticCredentialsProvider.create(credentials))
         .build();

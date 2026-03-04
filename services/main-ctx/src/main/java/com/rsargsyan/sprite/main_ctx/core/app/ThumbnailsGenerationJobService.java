@@ -35,8 +35,9 @@ public class ThumbnailsGenerationJobService {
   }
 
   @Transactional
-  public ThumbnailsGenerationJobDTO touch(String id) {
-    Optional<ThumbnailsGenerationJob> job = thumbnailsGenerationJobRepository.findById(TSID.from(id).toLong());
+  public ThumbnailsGenerationJobDTO touch(String accountId, String id) {
+    Optional<ThumbnailsGenerationJob> job = thumbnailsGenerationJobRepository
+        .findByAccountIdAndId(TSID.from(accountId).toLong(), TSID.from(id).toLong());
     if (job.isEmpty()) {
       throw new RuntimeException("TODO"); // create custom exception
     }
@@ -48,15 +49,19 @@ public class ThumbnailsGenerationJobService {
 
   @Transactional
   public void run(String id) {
-    thumbnailsGenerationJobRepository.findById(TSID.from(id).toLong()).ifPresentOrElse(
-        job -> {
-          job.run();
-          thumbnailsGenerationJobRepository.save(job);
-          applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobUpsertEvent(job.getId()));
-        },
-        () ->  {
-          throw new RuntimeException();
-        }
-    );
+    try {
+      thumbnailsGenerationJobRepository.findById(TSID.from(id).toLong()).ifPresentOrElse(
+          job -> {
+            job.run();
+            thumbnailsGenerationJobRepository.save(job);
+            applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobUpsertEvent(job.getId()));
+          },
+          () -> {
+            throw new RuntimeException();
+          }
+      );
+    } catch (Exception e) {
+      //
+    }
   }
 }

@@ -10,7 +10,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 
 @Entity
-public class ThumbnailsGenerationJob extends AggregateRoot {
+public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
   @Column(name = "url")
   @Getter
   private URL videoURL;
