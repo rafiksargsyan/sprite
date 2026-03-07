@@ -1,5 +1,8 @@
 package com.rsargsyan.sprite.main_ctx.core.domain.aggregate;
 
+import com.rsargsyan.sprite.main_ctx.core.domain.entity.LocalEntity;
+import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.Name;
+import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.NameConverter;
 import jakarta.persistence.*;
 import lombok.Getter;
 
@@ -19,17 +22,24 @@ public class User extends AccountScopedAggregateRoot {
   @Getter
   private List<ApiKey> apiKeys = new ArrayList<>();
 
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "principal_id", nullable = false)
+  private Principal principal;
+
   @Getter
-  private String name;
+  @Column(nullable = false)
+  @Convert(converter = NameConverter.class)
+  private Name name;
 
   @SuppressWarnings("unused")
   public User() {
 
   }
 
-  public User(Long accountId, String name) {
-    super(accountId);
-    this.name = name;
+  public User(Account account, Principal principal, String name) {
+    super(account);
+    this.principal = principal;
+    this.name = new Name(name);
   }
 
   public void createApiKey() {
@@ -38,7 +48,7 @@ public class User extends AccountScopedAggregateRoot {
 
   @Entity
   @Table(name = "api_key")
-  public class ApiKey extends com.rsargsyan.sprite.main_ctx.core.domain.entity.Entity {
+  public class ApiKey extends LocalEntity {
     @Getter
     private String key;
 
@@ -46,6 +56,7 @@ public class User extends AccountScopedAggregateRoot {
     @Getter
     private User user;
 
+    @SuppressWarnings("unused")
     ApiKey() {}
 
     ApiKey(User user) {

@@ -5,7 +5,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 
 @MappedSuperclass
-public abstract class Entity {
+public abstract class LocalEntity {
   @Id
   @GeneratedValue
   private Long id;

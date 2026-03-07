@@ -1,20 +1,19 @@
 package com.rsargsyan.sprite.main_ctx.core.domain.aggregate;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.*;
 import lombok.Getter;
 
 @MappedSuperclass
 public abstract class AccountScopedAggregateRoot extends AggregateRoot {
   @Getter
-  @Column(name = "account_id", nullable = false)
-  private Long accountId;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "account_id", nullable = false)
+  private Account account;
 
   protected AccountScopedAggregateRoot() {
-
   }
 
-  protected AccountScopedAggregateRoot(Long accountId) {
-    this.accountId = accountId;
+  protected AccountScopedAggregateRoot(Account account) {
+    this.account = account;
   }
 }

@@ -7,6 +7,7 @@ import com.rsargsyan.sprite.main_ctx.core.app.dto.UserDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -33,6 +34,13 @@ public class UserController {
       @RequestBody ApiKeyCreationDTO req
   ) {
     UserDTO user = userService.createApiKey(userId);
+    return new ResponseEntity<>(user, HttpStatus.CREATED);
+  }
+
+  @PostMapping("/signup")
+  public ResponseEntity<UserDTO> signup() {
+    UserContext userContext = UserContextHolder.get();
+    UserDTO user = userService.signUpWithExternal(userContext.getExternalId(), null);
     return new ResponseEntity<>(user, HttpStatus.CREATED);
   }
 }

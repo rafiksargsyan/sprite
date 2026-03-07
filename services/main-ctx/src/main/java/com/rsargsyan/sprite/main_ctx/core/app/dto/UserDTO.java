@@ -9,6 +9,6 @@ public class UserDTO {
   String name;
 
   public static UserDTO from(User user) {
-    return new UserDTO(user.getStrId(), user.getName());
+    return new UserDTO(user.getStrId(), user.getName().getValue());
   }
 }
