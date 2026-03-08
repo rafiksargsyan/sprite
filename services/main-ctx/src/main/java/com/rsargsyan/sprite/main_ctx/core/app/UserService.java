@@ -5,6 +5,7 @@ import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.Account;
 import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.Principal;
 import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.UserProfile;
 import com.rsargsyan.sprite.main_ctx.core.ports.repository.AccountRepository;
+import com.rsargsyan.sprite.main_ctx.core.ports.repository.ApiKeyRepository;
 import com.rsargsyan.sprite.main_ctx.core.ports.repository.PrincipalRepository;
 import com.rsargsyan.sprite.main_ctx.core.ports.repository.UserRepository;
 import io.hypersistence.tsid.TSID;
@@ -21,6 +22,7 @@ public class UserService {
   private UserRepository userRepository;
   private AccountRepository accountRepository;
   private PrincipalRepository principalRepository;
+  private ApiKeyRepository apiKeyRepository;
 
   @Autowired
   public UserService(UserRepository userRepository, AccountRepository accountRepository,
@@ -43,7 +45,6 @@ public class UserService {
       throw new RuntimeException();
     }
     UserProfile userProfile = userOpt.get();
-    userProfile.createApiKey();
     this.userRepository.save(userProfile);
     return UserDTO.from(userProfile);
   }

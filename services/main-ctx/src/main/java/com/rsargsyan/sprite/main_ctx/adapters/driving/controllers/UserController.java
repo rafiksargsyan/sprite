@@ -5,6 +5,7 @@ import com.rsargsyan.sprite.main_ctx.core.app.dto.ApiKeyCreationDTO;
 import com.rsargsyan.sprite.main_ctx.core.app.dto.UserCreationDTO;
 import com.rsargsyan.sprite.main_ctx.core.app.dto.UserDTO;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.graphql.GraphQlProperties;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
