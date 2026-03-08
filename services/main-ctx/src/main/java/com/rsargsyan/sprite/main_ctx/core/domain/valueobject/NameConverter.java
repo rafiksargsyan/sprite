@@ -8,7 +8,7 @@ public class NameConverter implements AttributeConverter<Name, String> {
 
   @Override
   public String convertToDatabaseColumn(Name attribute) {
-    return attribute.getValue();
+    return attribute.value();
   }
 
   @Override

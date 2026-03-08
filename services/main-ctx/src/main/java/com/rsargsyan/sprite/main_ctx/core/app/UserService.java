@@ -3,7 +3,7 @@ package com.rsargsyan.sprite.main_ctx.core.app;
 import com.rsargsyan.sprite.main_ctx.core.app.dto.UserDTO;
 import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.Account;
 import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.Principal;
-import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.User;
+import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.UserProfile;
 import com.rsargsyan.sprite.main_ctx.core.ports.repository.AccountRepository;
 import com.rsargsyan.sprite.main_ctx.core.ports.repository.PrincipalRepository;
 import com.rsargsyan.sprite.main_ctx.core.ports.repository.UserRepository;
@@ -38,14 +38,14 @@ public class UserService {
   }
 
   public UserDTO createApiKey(String userId) {
-    Optional<User> userOpt = this.userRepository.findById(TSID.from(userId).toLong());
+    Optional<UserProfile> userOpt = this.userRepository.findById(TSID.from(userId).toLong());
     if (userOpt.isEmpty()) {
       throw new RuntimeException();
     }
-    User user = userOpt.get();
-    user.createApiKey();
-    this.userRepository.save(user);
-    return UserDTO.from(user);
+    UserProfile userProfile = userOpt.get();
+    userProfile.createApiKey();
+    this.userRepository.save(userProfile);
+    return UserDTO.from(userProfile);
   }
 
   @Transactional
@@ -58,11 +58,11 @@ public class UserService {
     }
     Principal principal = new Principal(externalId);
     Account account = new Account();
-    User user = new User(account, principal, name);
+    UserProfile userProfile = new UserProfile(account, principal, name);
     principalRepository.save(principal);
     accountRepository.save(account);
-    userRepository.save(user);
+    userRepository.save(userProfile);
 
-    return UserDTO.from(user);
+    return UserDTO.from(userProfile);
   }
 }
