@@ -4,5 +4,5 @@ import lombok.Value;
 
 @Value
 public class ApiKeyCreationDTO {
-  String name;
+  String description;
 }

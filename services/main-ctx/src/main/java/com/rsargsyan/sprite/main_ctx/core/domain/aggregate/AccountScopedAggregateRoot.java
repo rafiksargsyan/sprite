@@ -14,6 +14,9 @@ public abstract class AccountScopedAggregateRoot extends AggregateRoot {
   }
 
   protected AccountScopedAggregateRoot(Account account) {
+    if (account == null) {
+      throw new IllegalArgumentException("Account can't be null");
+    }
     this.account = account;
   }
 }

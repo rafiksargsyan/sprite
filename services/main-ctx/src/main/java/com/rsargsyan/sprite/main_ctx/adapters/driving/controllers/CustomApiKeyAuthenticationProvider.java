@@ -1,5 +1,7 @@
 package com.rsargsyan.sprite.main_ctx.adapters.driving.controllers;
 
+import com.rsargsyan.sprite.main_ctx.core.ports.repository.UserProfileRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
@@ -7,6 +9,9 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class CustomApiKeyAuthenticationProvider implements AuthenticationProvider {
+  @Autowired
+  private UserProfileRepository userProfileRepository;
+
   @Override
   public Authentication authenticate(Authentication auth) throws AuthenticationException {
     CustomApiKey apiKey = (CustomApiKey) auth;
@@ -19,4 +24,3 @@ public class CustomApiKeyAuthenticationProvider implements AuthenticationProvide
     return CustomApiKey.class.isAssignableFrom(auth);
   }
 }
-

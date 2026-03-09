@@ -7,7 +7,8 @@ import lombok.Value;
 @Builder
 public class UserContext {
   String externalId;
-  String id;
+  String userProfileId;
   String accountId;
+  String fullName;
 }
 
