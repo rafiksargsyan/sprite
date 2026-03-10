@@ -7,9 +7,13 @@ public class CustomApiKey extends AbstractAuthenticationToken {
   @Getter
   private String apiKey;
 
-  public CustomApiKey(String apiKey) {
+  @Getter
+  private String apiKeyId;
+
+  public CustomApiKey(String apiKeyId, String apiKey) {
     super(null);
     this.apiKey = apiKey;
+    this.apiKeyId = apiKeyId;
   }
 
   @Override

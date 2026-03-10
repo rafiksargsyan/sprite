@@ -25,9 +25,9 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
       FilterChain filterChain)
       throws ServletException, IOException {
     String apiKey = request.getHeader("X-API-KEY");
-
+    String apiKeyId = request.getHeader("X-API-KEY-ID");
     if (apiKey != null) {
-      SecurityContextHolder.getContext().setAuthentication(authManager.authenticate(new CustomApiKey(apiKey)));
+      SecurityContextHolder.getContext().setAuthentication(authManager.authenticate(new CustomApiKey(apiKeyId, apiKey)));
     }
 
     filterChain.doFilter(request, response);

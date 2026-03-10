@@ -67,7 +67,7 @@ public class ApiKey extends AccountScopedAggregateRoot {
     lastAccessTime = Instant.now();
   }
 
-  private String hash(String key) {
+  private static String hash(String key) {
     return passwordEncoder.encode(key);
   }
 

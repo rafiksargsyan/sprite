@@ -41,6 +41,7 @@ public class UserProfile extends AccountScopedAggregateRoot {
     var apiKey = new ApiKey(this, description);
     if (apiKeys.size() >= 2) throw new ApiKeyLimitReachedException();
     apiKeys.add(apiKey);
+    touch();
     return apiKey.getKey();
   }
 
