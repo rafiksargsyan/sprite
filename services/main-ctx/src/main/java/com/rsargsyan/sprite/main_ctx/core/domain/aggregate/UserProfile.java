@@ -14,6 +14,7 @@ import java.util.List;
 public class UserProfile extends AccountScopedAggregateRoot {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "principal_id", nullable = false)
+  @Getter
   private Principal principal;
 
   @Getter

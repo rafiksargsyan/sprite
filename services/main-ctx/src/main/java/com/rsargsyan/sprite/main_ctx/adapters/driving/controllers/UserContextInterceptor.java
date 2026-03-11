@@ -1,38 +1,36 @@
 package com.rsargsyan.sprite.main_ctx.adapters.driving.controllers;
 
-import com.rsargsyan.sprite.main_ctx.core.ports.repository.PrincipalRepository;
-import com.rsargsyan.sprite.main_ctx.core.ports.repository.UserProfileRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.util.Map;
 
 public class UserContextInterceptor implements HandlerInterceptor {
-  private final UserProfileRepository userProfileRepository;
+  private final AuthService authService;
 
-  public UserContextInterceptor(UserProfileRepository userProfileRepository) {
-    this.userProfileRepository = userProfileRepository;
+  public UserContextInterceptor(AuthService authService) {
+    this.authService = authService;
   }
+
   @Override
   public boolean preHandle(HttpServletRequest request, HttpServletResponse response,
                            Object handler) throws Exception {
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
     Object principal = auth.getPrincipal();
-    if (principal instanceof Jwt) {
-      Map<String, Object> claims = ((Jwt) principal).getClaims();
+    if (principal instanceof Jwt jwt) {
+      Map<String, Object> claims = jwt.getClaims();
       String externalId = (String) claims.get("sub");
       String accountId = request.getHeader("X-ACCOUNT-ID");
       String fullName = (String) claims.get("name");
       UserContextHolder.set(UserContext.builder().externalId(externalId)
           .accountId(accountId).fullName(fullName).build());
-    } else if (auth instanceof CustomApiKey) {
-      //TODO
+    } else if (auth instanceof CustomApiKey customApiKey) {
+      var userContext = authService.getUserContextByApiKey(customApiKey.getApiKeyId());
+      UserContextHolder.set(userContext);
     } else {
       throw new RuntimeException("not support auth");
     }

@@ -13,6 +13,7 @@ import java.util.List;
 @Entity
 public class Principal extends AggregateRoot {
   @Column(name = "external_id", unique = true)
+  @Getter
   private String externalId;
 
   @Getter
