@@ -1,5 +1,6 @@
 package com.rsargsyan.sprite.main_ctx.adapters.driving.controllers;
 
+import com.rsargsyan.sprite.main_ctx.core.app.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.core.Authentication;
@@ -26,8 +27,9 @@ public class UserContextInterceptor implements HandlerInterceptor {
       String externalId = (String) claims.get("sub");
       String accountId = request.getHeader("X-ACCOUNT-ID");
       String fullName = (String) claims.get("name");
+      String userProfileId = authService.getUserProfileId(externalId, accountId);
       UserContextHolder.set(UserContext.builder().externalId(externalId)
-          .accountId(accountId).fullName(fullName).build());
+          .accountId(accountId).fullName(fullName).userProfileId(userProfileId).build());
     } else if (auth instanceof CustomApiKey customApiKey) {
       var userContext = authService.getUserContextByApiKey(customApiKey.getApiKeyId());
       UserContextHolder.set(userContext);

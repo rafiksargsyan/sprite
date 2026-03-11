@@ -1,7 +1,6 @@
 package com.rsargsyan.sprite.main_ctx.adapters.driving.controllers;
 
-import com.rsargsyan.sprite.main_ctx.core.ports.repository.ApiKeyRepository;
-import com.rsargsyan.sprite.main_ctx.core.ports.repository.UserProfileRepository;
+import com.rsargsyan.sprite.main_ctx.core.app.AuthService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;

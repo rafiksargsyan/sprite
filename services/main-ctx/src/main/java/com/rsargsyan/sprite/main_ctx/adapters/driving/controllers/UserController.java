@@ -42,10 +42,13 @@ public class UserController {
   public ResponseEntity<ApiKeyDTO> createApiKey(@PathVariable String userId,
                                                 @RequestBody ApiKeyCreationDTO req) {
     UserContext userContext = UserContextHolder.get();
-    UserProfile userProfile = findUserProfileByExternalIdAndAccountId(userContext.getExternalId(),
-        userContext.getAccountId());
-    ApiKeyDTO apiKeyDTO = userService.createApiKey(userProfile != null ? userProfile.getStrId() : null,
-        userId, req.getDescription());
+    String userProfileId = userContext.getUserProfileId();
+    if (userProfileId == null) {
+      UserProfile userProfile = findUserProfileByExternalIdAndAccountId(userContext.getExternalId(),
+          userContext.getAccountId());
+      userProfileId = userProfile != null ? userProfile.getStrId() : null;
+    }
+    ApiKeyDTO apiKeyDTO = userService.createApiKey(userProfileId, userId, req.getDescription());
     return new ResponseEntity<>(apiKeyDTO, HttpStatus.CREATED);
   }
 

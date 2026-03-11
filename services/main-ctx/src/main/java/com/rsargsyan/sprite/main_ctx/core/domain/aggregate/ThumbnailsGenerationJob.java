@@ -20,9 +20,10 @@ public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
   private Status status;
 
   @SuppressWarnings("unused")
-  public ThumbnailsGenerationJob() {}
+  ThumbnailsGenerationJob() {}
 
-  public ThumbnailsGenerationJob(String videoURL) {
+  public ThumbnailsGenerationJob(Account account, String videoURL) {
+    super(account);
     this.status = Status.SUBMITTED;
     try {
       this.videoURL = new URL(videoURL);

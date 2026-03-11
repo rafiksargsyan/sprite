@@ -57,7 +57,7 @@ public class WorkersConfig {
         } catch (IOException e) {
           throw new RuntimeException(e); //TODO
         }
-      }, 5, TimeUnit.MINUTES);
+      }, 5, TimeUnit.SECONDS);
     }
   }
 

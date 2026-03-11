@@ -23,7 +23,8 @@ public class ThumbnailsGenerationJobController {
     public ResponseEntity<ThumbnailsGenerationJobDTO> createThumbnailsGenerationJob(
         @RequestBody ThumbnailsGenerationJobCreationDTO req
     ) {
-        ThumbnailsGenerationJobDTO job = thumbnailsGenerationJobService.create(req.getVideoURL());
+        var userCtx = UserContextHolder.get();
+        ThumbnailsGenerationJobDTO job = thumbnailsGenerationJobService.create(userCtx.getAccountId(), req.getVideoURL());
         return new ResponseEntity<>(job, HttpStatus.CREATED);
     }
 
