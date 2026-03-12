@@ -4,7 +4,9 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -25,8 +27,13 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
     String apiKeyId = request.getHeader("X-API-KEY-ID");
 
     if (apiKeyId != null && apiKey != null) {
-      SecurityContextHolder.getContext()
-          .setAuthentication(authManager.authenticate(new CustomApiKey(apiKeyId, apiKey)));
+      try {
+        SecurityContextHolder.getContext()
+            .setAuthentication(authManager.authenticate(new CustomApiKey(apiKeyId, apiKey)));
+      } catch (AuthenticationException e) {
+        response.setStatus(HttpStatus.UNAUTHORIZED.value());
+        return;
+      }
     }
 
     filterChain.doFilter(request, response);
