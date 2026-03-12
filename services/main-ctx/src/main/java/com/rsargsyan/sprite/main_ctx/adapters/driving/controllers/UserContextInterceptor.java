@@ -18,8 +18,7 @@ public class UserContextInterceptor implements HandlerInterceptor {
   }
 
   @Override
-  public boolean preHandle(HttpServletRequest request, HttpServletResponse response,
-                           Object handler) throws Exception {
+  public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
     Object principal = auth.getPrincipal();
     if (principal instanceof Jwt jwt) {
@@ -34,7 +33,7 @@ public class UserContextInterceptor implements HandlerInterceptor {
       var userContext = authService.getUserContextByApiKey(customApiKey.getApiKeyId());
       UserContextHolder.set(userContext);
     } else {
-      throw new RuntimeException("not support auth");
+      assert false;
     }
     return true;
   }

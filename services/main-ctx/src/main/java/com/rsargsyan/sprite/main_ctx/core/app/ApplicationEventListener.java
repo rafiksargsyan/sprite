@@ -27,7 +27,7 @@ public class ApplicationEventListener {
   @Async
   @TransactionalEventListener
   public void handleThumbnailsGenerationJobUpsertEvent(ThumbnailsGenerationJobUpsertEvent event) {
-    thumbnailsGenerationJobRepository.findById(event.getJobId()).ifPresentOrElse(
+    thumbnailsGenerationJobRepository.findById(event.jobId()).ifPresentOrElse(
         job -> {
           if (job.getStatus() == ThumbnailsGenerationJob.Status.SUBMITTED) {
             job.queue();

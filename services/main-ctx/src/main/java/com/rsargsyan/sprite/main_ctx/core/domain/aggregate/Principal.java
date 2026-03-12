@@ -2,13 +2,9 @@ package com.rsargsyan.sprite.main_ctx.core.domain.aggregate;
 
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.FullName;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.NameConverter;
-import com.rsargsyan.sprite.main_ctx.core.exception.ApiKeyLimitReachedException;
 import com.rsargsyan.sprite.main_ctx.core.exception.BlankExternalIdException;
 import jakarta.persistence.*;
 import lombok.Getter;
-
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
 public class Principal extends AggregateRoot {

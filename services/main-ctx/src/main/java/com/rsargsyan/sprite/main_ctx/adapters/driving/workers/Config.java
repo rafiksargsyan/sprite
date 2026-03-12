@@ -8,6 +8,7 @@ import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
 import org.springframework.amqp.rabbit.listener.api.ChannelAwareMessageListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -16,8 +17,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-@Component
-public class WorkersConfig {
+@Configuration("workersConfig")
+public class Config {
 
   @Autowired
   private com.rsargsyan.sprite.main_ctx.Config config;

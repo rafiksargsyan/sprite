@@ -21,6 +21,8 @@ public abstract class AggregateRoot {
   @Getter
   private Instant updatedAt;
 
+  private Integer localEntityCounter = 0;
+
   protected AggregateRoot() {
     this.updatedAt = Instant.now();
   }
@@ -29,7 +31,11 @@ public abstract class AggregateRoot {
     return TSID.from(id).toString();
   }
 
-  public void touch() {
+  protected void touch() {
     this.updatedAt = Instant.now();
+  }
+
+  protected Integer nextLocalId() {
+    return localEntityCounter++;
   }
 }

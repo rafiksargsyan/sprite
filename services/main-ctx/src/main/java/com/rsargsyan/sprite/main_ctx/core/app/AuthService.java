@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class AuthService {
@@ -32,11 +33,13 @@ public class AuthService {
 
   @Transactional
   public UserContext getUserContextByApiKey(String apiKeyId) {
+    if (!TSID.isValid(apiKeyId)) return null;
     var apiKeyFromDBOpt = apiKeyRepository.findById(TSID.from(apiKeyId).toLong());
+    if (apiKeyFromDBOpt.isEmpty()) return null;
     ApiKey apiKeyFromDB =  apiKeyFromDBOpt.get();
     UserProfile userProfile = apiKeyFromDB.getUserProfile();
     apiKeyFromDB.accessed();
-    apiKeyRepository.save(apiKeyFromDB); // publish event and process in separate transaction
+    apiKeyRepository.save(apiKeyFromDB); //TODO: publish event and process in separate transaction
     return UserContext.builder().userProfileId(userProfile.getStrId())
         .accountId(userProfile.getAccount().getStrId())
         .externalId(userProfile.getPrincipal().getExternalId()).build();
@@ -47,9 +50,19 @@ public class AuthService {
     List<Principal> principals = principalRepository.findByExternalId(externalId);
     if (principals.isEmpty()) return null;
     var principal = principals.get(0);
+    if (!TSID.isValid(accountId)) return null;
     List<UserProfile> userProfiles = userProfileRepository.findByPrincipalIdAndAccountId(principal.getId(),
         TSID.from(accountId).toLong());
     if (userProfiles.isEmpty()) return null;
     return userProfiles.get(0).getStrId();
+  }
+
+  public boolean validateApiKey(String apiKeyId, String apiKey) {
+    if (!TSID.isValid(apiKeyId)) return false;
+    Optional<ApiKey> apiKeyFromDB = apiKeyRepository.findById(TSID.from(apiKeyId).toLong());
+    if (apiKeyFromDB.isPresent() && apiKeyFromDB.get().check(apiKey)) {
+      return true;
+    }
+    return false;
   }
 }

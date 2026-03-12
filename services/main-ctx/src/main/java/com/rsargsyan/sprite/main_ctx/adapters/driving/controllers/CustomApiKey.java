@@ -3,12 +3,10 @@ package com.rsargsyan.sprite.main_ctx.adapters.driving.controllers;
 import lombok.Getter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 
+@Getter
 public class CustomApiKey extends AbstractAuthenticationToken {
-  @Getter
-  private String apiKey;
-
-  @Getter
-  private String apiKeyId;
+  private final String apiKey;
+  private final String apiKeyId;
 
   public CustomApiKey(String apiKeyId, String apiKey) {
     super(null);
@@ -23,6 +21,6 @@ public class CustomApiKey extends AbstractAuthenticationToken {
 
   @Override
   public Object getPrincipal() {
-    return this.apiKey;
+    return this.apiKeyId;
   }
 }

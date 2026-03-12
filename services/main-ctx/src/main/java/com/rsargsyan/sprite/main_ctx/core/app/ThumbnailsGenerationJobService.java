@@ -1,7 +1,9 @@
 package com.rsargsyan.sprite.main_ctx.core.app;
 
+import com.rsargsyan.sprite.main_ctx.core.Util;
 import com.rsargsyan.sprite.main_ctx.core.app.dto.ThumbnailsGenerationJobDTO;
 import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.ThumbnailsGenerationJob;
+import com.rsargsyan.sprite.main_ctx.core.exception.ResourceNotFoundException;
 import com.rsargsyan.sprite.main_ctx.core.ports.repository.AccountRepository;
 import com.rsargsyan.sprite.main_ctx.core.ports.repository.ThumbnailsGenerationJobRepository;
 import io.hypersistence.tsid.TSID;
@@ -33,7 +35,8 @@ public class ThumbnailsGenerationJobService {
 
   @Transactional
   public ThumbnailsGenerationJobDTO create(String accountId, String videoURL) {
-    var accountOpt = accountRepository.findById(TSID.from(accountId).toLong());
+    var accountOpt = accountRepository.findById(Util.validateTSID(accountId));
+    if (accountOpt.isEmpty()) throw new ResourceNotFoundException();
     ThumbnailsGenerationJob job = new ThumbnailsGenerationJob(accountOpt.get(), videoURL);
     thumbnailsGenerationJobRepository.save(job);
     applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobUpsertEvent(job.getId()));
@@ -41,22 +44,9 @@ public class ThumbnailsGenerationJobService {
   }
 
   @Transactional
-  public ThumbnailsGenerationJobDTO touch(String accountId, String id) {
-    Optional<ThumbnailsGenerationJob> job = thumbnailsGenerationJobRepository
-        .findByAccountIdAndId(TSID.from(accountId).toLong(), TSID.from(id).toLong());
-    if (job.isEmpty()) {
-      throw new RuntimeException("TODO"); // create custom exception
-    }
-    job.get().touch();
-    thumbnailsGenerationJobRepository.save(job.get());
-    applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobUpsertEvent(job.get().getId()));
-    return ThumbnailsGenerationJobDTO.from(job.get());
-  }
-
-  @Transactional
   public void run(String id) {
     try {
-      thumbnailsGenerationJobRepository.findById(TSID.from(id).toLong()).ifPresentOrElse(
+      thumbnailsGenerationJobRepository.findById(Util.validateTSID(id)).ifPresentOrElse(
           job -> {
             job.run();
             thumbnailsGenerationJobRepository.save(job);

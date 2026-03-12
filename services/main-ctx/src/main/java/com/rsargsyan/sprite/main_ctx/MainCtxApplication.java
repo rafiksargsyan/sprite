@@ -7,9 +7,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 @SpringBootApplication
 @EnableAsync
 public class MainCtxApplication {
-
 	public static void main(String[] args) {
 		SpringApplication.run(MainCtxApplication.class, args);
 	}
-
 }

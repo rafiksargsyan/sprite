@@ -1,5 +1,6 @@
 package com.rsargsyan.sprite.main_ctx.core.domain.aggregate;
 
+import com.rsargsyan.sprite.main_ctx.core.exception.MalformedUrlException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -10,12 +11,11 @@ import java.net.MalformedURLException;
 import java.net.URL;
 
 @Entity
+@Getter
 public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
   @Column(name = "url")
-  @Getter
   private URL videoURL;
 
-  @Getter
   @Enumerated(EnumType.STRING)
   private Status status;
 
@@ -28,7 +28,7 @@ public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
     try {
       this.videoURL = new URL(videoURL);
     } catch (MalformedURLException e) {
-      throw new RuntimeException(e);
+      throw new MalformedUrlException("'%s' is not a valid URL".formatted(videoURL));
     }
   }
 

@@ -4,17 +4,14 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
 public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
-  private AuthenticationManager authManager;
+  private final AuthenticationManager authManager;
   public ApiKeyAuthenticationFilter(AuthenticationManager authenticationManager) {
     authManager = authenticationManager;
   }
@@ -26,8 +23,10 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
       throws ServletException, IOException {
     String apiKey = request.getHeader("X-API-KEY");
     String apiKeyId = request.getHeader("X-API-KEY-ID");
-    if (apiKey != null) {
-      SecurityContextHolder.getContext().setAuthentication(authManager.authenticate(new CustomApiKey(apiKeyId, apiKey)));
+
+    if (apiKeyId != null && apiKey != null) {
+      SecurityContextHolder.getContext()
+          .setAuthentication(authManager.authenticate(new CustomApiKey(apiKeyId, apiKey)));
     }
 
     filterChain.doFilter(request, response);

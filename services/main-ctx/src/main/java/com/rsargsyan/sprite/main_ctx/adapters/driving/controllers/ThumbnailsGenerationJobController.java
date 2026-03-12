@@ -28,10 +28,4 @@ public class ThumbnailsGenerationJobController {
         return new ResponseEntity<>(job, HttpStatus.CREATED);
     }
 
-    @PatchMapping("/{id}/touch")
-    public ResponseEntity<ThumbnailsGenerationJobDTO> touch(@PathVariable String id) {
-        String accountId = ""; //TODO get
-        ThumbnailsGenerationJobDTO job = thumbnailsGenerationJobService.touch(accountId, id);
-        return new ResponseEntity<>(job, HttpStatus.OK);
-    }
 }
