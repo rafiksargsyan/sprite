@@ -4,7 +4,6 @@ import com.rsargsyan.sprite.main_ctx.core.app.AuthService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -17,7 +16,7 @@ public class CustomApiKeyAuthenticationProvider implements AuthenticationProvide
   }
 
   @Override
-  public Authentication authenticate(Authentication auth) throws AuthenticationException {
+  public Authentication authenticate(Authentication auth) {
     CustomApiKey apiKey = (CustomApiKey) auth;
     if (authService.validateApiKey(apiKey.getApiKeyId(), apiKey.getApiKey())) {
       apiKey.setAuthenticated(true);
