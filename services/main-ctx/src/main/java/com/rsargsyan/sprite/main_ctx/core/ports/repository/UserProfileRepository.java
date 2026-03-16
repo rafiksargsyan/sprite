@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface UserProfileRepository extends JpaRepository<UserProfile, Long> {
   List<UserProfile> findByPrincipalIdAndAccountId(Long principalId, Long accountId);
+  List<UserProfile> findByPrincipalId(Long principalId);
 }

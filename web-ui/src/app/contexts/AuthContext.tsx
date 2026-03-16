@@ -16,6 +16,7 @@ import {
   getEmailForSignIn,
   clearEmailForSignIn,
 } from '../../utils/emailStorage';
+import { signUpExternal } from '../../api/users';
 import type { AuthContextValue } from '../../types/auth.types';
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
@@ -27,14 +28,24 @@ const ACTION_CODE_SETTINGS = {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [accountId, setAccountId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [pendingEmailConfirmation, setPendingEmailConfirmation] = useState(false);
-  // Captured before React Router navigates away and strips the query params
   const [pendingSignInLink, setPendingSignInLink] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
+      if (firebaseUser) {
+        try {
+          const dto = await signUpExternal(firebaseUser);
+          setAccountId(dto.accountId);
+        } catch {
+          setAccountId(null);
+        }
+      } else {
+        setAccountId(null);
+      }
       setLoading(false);
     });
 
@@ -89,6 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        accountId,
         loading,
         pendingEmailConfirmation,
         signInWithGoogle,

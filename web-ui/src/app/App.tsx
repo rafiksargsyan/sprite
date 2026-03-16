@@ -5,6 +5,8 @@ import { EmailConfirmation } from '../components/EmailConfirmation/EmailConfirma
 import { Layout } from '../components/Layout/Layout';
 import { Login } from '../pages/Login';
 import { Dashboard } from '../pages/Dashboard';
+import { JobSpecs } from '../pages/JobSpecs';
+import { Jobs } from '../pages/Jobs';
 
 export default function App() {
   return (
@@ -22,7 +24,8 @@ export default function App() {
           >
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/thumbnails" element={<ComingSoon title="Thumbnails" />} />
+            <Route path="/job-specs" element={<JobSpecs />} />
+            <Route path="/jobs" element={<Jobs />} />
             <Route path="/api-keys" element={<ComingSoon title="API Keys" />} />
             <Route path="/settings" element={<ComingSoon title="Settings" />} />
           </Route>

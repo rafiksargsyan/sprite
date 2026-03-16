@@ -1,5 +1,7 @@
 package com.rsargsyan.sprite.main_ctx.core.domain.valueobject;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.rsargsyan.sprite.main_ctx.core.exception.InvalidThumbnailConfigException;
 
 public record WebpThumbnailConfig(int resolution, SpriteSize spriteSize, int quality, int method, boolean lossless, int interval) implements ThumbnailConfig {
@@ -12,11 +14,13 @@ public record WebpThumbnailConfig(int resolution, SpriteSize spriteSize, int qua
   }
 
   @Override
+  @JsonProperty
   public String format() {
     return "webp";
   }
 
   @Override
+  @JsonIgnore
   public String subfolderName() {
     return "webp_r%d_q%d_m%d_%s_i%d_%dx%d".formatted(
         resolution, quality, method, lossless ? "lossless" : "lossy", interval,

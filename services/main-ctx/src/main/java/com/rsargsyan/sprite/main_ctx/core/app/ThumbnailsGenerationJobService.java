@@ -12,6 +12,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class ThumbnailsGenerationJobService {
 
@@ -31,6 +33,11 @@ public class ThumbnailsGenerationJobService {
     this.applicationEventPublisher = applicationEventPublisher;
     this.accountRepository = accountRepository;
     this.jobSpecRepository = jobSpecRepository;
+  }
+
+  public List<ThumbnailsGenerationJobDTO> findAll(String accountId) {
+    return thumbnailsGenerationJobRepository.findByAccountId(Util.validateTSID(accountId))
+        .stream().map(ThumbnailsGenerationJobDTO::from).toList();
   }
 
   @Transactional

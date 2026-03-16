@@ -2,8 +2,12 @@ package com.rsargsyan.sprite.main_ctx.core.app.dto;
 
 import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.UserProfile;
 
-public record UserDTO(String id, String name) {
+public record UserDTO(String id, String name, String accountId) {
   public static UserDTO from(UserProfile userProfile) {
-    return new UserDTO(userProfile.getStrId(), userProfile.getFullName().value());
+    return new UserDTO(
+        userProfile.getStrId(),
+        userProfile.getFullName().value(),
+        userProfile.getAccount().getStrId()
+    );
   }
 }

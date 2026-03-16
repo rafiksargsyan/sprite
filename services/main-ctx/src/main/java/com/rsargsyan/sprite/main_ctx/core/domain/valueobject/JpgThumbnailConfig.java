@@ -1,5 +1,7 @@
 package com.rsargsyan.sprite.main_ctx.core.domain.valueobject;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.rsargsyan.sprite.main_ctx.core.exception.InvalidThumbnailConfigException;
 
 public record JpgThumbnailConfig(int resolution, SpriteSize spriteSize, int quality, int interval) implements ThumbnailConfig {
@@ -11,11 +13,13 @@ public record JpgThumbnailConfig(int resolution, SpriteSize spriteSize, int qual
   }
 
   @Override
+  @JsonProperty
   public String format() {
     return "jpg";
   }
 
   @Override
+  @JsonIgnore
   public String subfolderName() {
     return "jpg_r%d_q%d_i%d_%dx%d".formatted(resolution, quality, interval, spriteSize.rows(), spriteSize.cols());
   }

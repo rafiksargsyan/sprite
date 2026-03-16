@@ -32,6 +32,6 @@ public class UserController {
   public ResponseEntity<UserDTO> signupExternal() {
     UserContext userContext = UserContextHolder.get();
     UserDTO user = userService.signUpWithExternal(userContext.getExternalId(), userContext.getFullName());
-    return new ResponseEntity<>(user, HttpStatus.CREATED);
+    return ResponseEntity.ok(user);
   }
 }

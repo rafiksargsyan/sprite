@@ -8,6 +8,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/job-spec")
 public class JobSpecController {
@@ -17,6 +19,12 @@ public class JobSpecController {
     @Autowired
     public JobSpecController(JobSpecService jobSpecService) {
         this.jobSpecService = jobSpecService;
+    }
+
+    @GetMapping
+    public ResponseEntity<List<JobSpecDTO>> findAll() {
+        var userCtx = UserContextHolder.get();
+        return ResponseEntity.ok(jobSpecService.findAll(userCtx.getAccountId()));
     }
 
     @PostMapping

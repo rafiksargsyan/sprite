@@ -8,7 +8,6 @@ import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.ApiKey;
 import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.Principal;
 import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.UserProfile;
 import com.rsargsyan.sprite.main_ctx.core.exception.AuthorizationException;
-import com.rsargsyan.sprite.main_ctx.core.exception.PrincipalAlreadyExistsException;
 import com.rsargsyan.sprite.main_ctx.core.exception.ResourceNotFoundException;
 import com.rsargsyan.sprite.main_ctx.core.ports.repository.AccountRepository;
 import com.rsargsyan.sprite.main_ctx.core.ports.repository.ApiKeyRepository;
@@ -49,13 +48,14 @@ public class UserService {
 
   @Transactional
   public UserDTO signUpWithExternal(String externalId, String name) {
-    var principalName = name;
-    if (name == null || name.isBlank()) name = "Your full name here";
     List<Principal> principalList = principalRepository.findByExternalId(externalId);
     if (!principalList.isEmpty()) {
-      throw new PrincipalAlreadyExistsException();
+      var existing = userProfileRepository.findByPrincipalId(principalList.get(0).getId());
+      if (existing.isEmpty()) throw new ResourceNotFoundException();
+      return UserDTO.from(existing.get(0));
     }
-    Principal principal = new Principal(externalId, principalName);
+    if (name == null || name.isBlank()) name = "Your full name here";
+    Principal principal = new Principal(externalId, name);
     Account account = new Account();
     UserProfile userProfile = new UserProfile(account, principal, name);
     principalRepository.save(principal);

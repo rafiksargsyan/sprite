@@ -8,6 +8,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/thumbnails-generation-job")
 public class ThumbnailsGenerationJobController {
@@ -17,6 +19,12 @@ public class ThumbnailsGenerationJobController {
     @Autowired
     public ThumbnailsGenerationJobController(ThumbnailsGenerationJobService thumbnailsGenerationJobService) {
         this.thumbnailsGenerationJobService = thumbnailsGenerationJobService;
+    }
+
+    @GetMapping
+    public ResponseEntity<List<ThumbnailsGenerationJobDTO>> findAll() {
+        var userCtx = UserContextHolder.get();
+        return ResponseEntity.ok(thumbnailsGenerationJobService.findAll(userCtx.getAccountId()));
     }
 
     @PostMapping

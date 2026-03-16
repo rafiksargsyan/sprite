@@ -26,7 +26,7 @@ public class UserContextInterceptor implements HandlerInterceptor {
       String externalId = (String) claims.get("sub");
       String accountId = request.getHeader("X-ACCOUNT-ID");
       String fullName = (String) claims.get("name");
-      String userProfileId = authService.getUserProfileId(externalId, accountId);
+      String userProfileId = accountId != null ? authService.getUserProfileId(externalId, accountId) : null;
       UserContextHolder.set(UserContext.builder().externalId(externalId)
           .accountId(accountId).fullName(fullName).userProfileId(userProfileId).build());
     } else if (auth instanceof CustomApiKey customApiKey) {

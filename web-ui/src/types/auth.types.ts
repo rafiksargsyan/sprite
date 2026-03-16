@@ -2,6 +2,7 @@ import type { User } from 'firebase/auth';
 
 export interface AuthContextValue {
   user: User | null;
+  accountId: string | null;
   loading: boolean;
   pendingEmailConfirmation: boolean;
   signInWithGoogle: () => Promise<void>;

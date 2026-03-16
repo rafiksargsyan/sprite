@@ -49,8 +49,8 @@ public class ApplicationEventListener {
         job -> {
           if (job.getStatus() == ThumbnailsGenerationJob.Status.SUBMITTED) {
             job.queue();
-            rabbitTemplate.convertAndSend(config.topicExchangeName, "test", job.getStrId());
             thumbnailsGenerationJobRepository.save(job);
+            rabbitTemplate.convertAndSend(config.topicExchangeName, "test", job.getStrId());
           } else if (job.getStatus() == ThumbnailsGenerationJob.Status.IN_PROGRESS) {
             processVideoAndUpload(job);
           }

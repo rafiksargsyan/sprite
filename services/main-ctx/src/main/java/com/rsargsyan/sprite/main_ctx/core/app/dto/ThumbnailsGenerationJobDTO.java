@@ -10,9 +10,12 @@ import java.net.URL;
 public class ThumbnailsGenerationJobDTO {
   String id;
   URL videoUrl;
+  String status;
   EmbeddedJobSpec jobSpec;
 
   public static ThumbnailsGenerationJobDTO from(ThumbnailsGenerationJob job) {
-    return new ThumbnailsGenerationJobDTO(job.getStrId(), job.getVideoURL(), job.getJobSpec());
+    return new ThumbnailsGenerationJobDTO(
+        job.getStrId(), job.getVideoURL(), job.getStatus().name(), job.getJobSpec()
+    );
   }
 }

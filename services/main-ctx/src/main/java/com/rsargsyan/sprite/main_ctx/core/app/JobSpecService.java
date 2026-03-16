@@ -35,6 +35,11 @@ public class JobSpecService {
     return JobSpecDTO.from(jobSpec);
   }
 
+  public List<JobSpecDTO> findAll(String accountId) {
+    return jobSpecRepository.findByAccountId(Util.validateTSID(accountId))
+        .stream().map(JobSpecDTO::from).toList();
+  }
+
   public JobSpecDTO findById(String accountId, String jobSpecId) {
     return jobSpecRepository
         .findByAccountIdAndId(Util.validateTSID(accountId), Util.validateTSID(jobSpecId))

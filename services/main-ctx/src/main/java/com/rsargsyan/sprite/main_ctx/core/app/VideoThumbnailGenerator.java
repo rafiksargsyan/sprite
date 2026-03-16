@@ -13,12 +13,11 @@ public class VideoThumbnailGenerator {
 
   public static void run(String videoFilePath, Path configFolder, ThumbnailConfig config) throws Exception {
 
-    Path videoPath = Paths.get(videoFilePath).toAbsolutePath();
     Files.createDirectories(configFolder);
 
-    double fps = resolveFps(videoPath);
+    double fps = resolveFps(videoFilePath);
 
-    generateThumbnails(videoPath, configFolder, config.resolution(), config.interval(), fps);
+    generateThumbnails(videoFilePath, configFolder, config.resolution(), config.interval(), fps);
 
     Dimension dim = resolveImageSize(configFolder.resolve("thumbnail-000001.png"));
 
@@ -44,37 +43,58 @@ public class VideoThumbnailGenerator {
         config.interval(), config.format());
   }
 
-  private static double resolveFps(Path videoPath) throws Exception {
+  private static double resolveFps(String videoUrl) throws Exception {
 
     ProcessBuilder pb = new ProcessBuilder(
         "ffprobe",
         "-v", "quiet",
         "-print_format", "json",
         "-show_streams",
-        "-i", videoPath.toString()
+        "-i", videoUrl
     );
 
     Process process = pb.start();
     String json = new String(process.getInputStream().readAllBytes());
+    int exitCode = process.waitFor();
+    if (exitCode != 0) {
+      throw new RuntimeException("ffprobe failed (exit " + exitCode + ") for: " + videoUrl);
+    }
 
     ObjectMapper mapper = new ObjectMapper();
     JsonNode root = mapper.readTree(json);
 
-    String rate = root.get("streams").get(1).get("r_frame_rate").asText();
+    JsonNode streams = root.get("streams");
+    if (streams == null || !streams.isArray()) {
+      throw new RuntimeException("ffprobe returned no streams for: " + videoUrl);
+    }
+
+    JsonNode videoStream = null;
+    for (JsonNode stream : streams) {
+      JsonNode codecType = stream.get("codec_type");
+      if (codecType != null && "video".equals(codecType.asText())) {
+        videoStream = stream;
+        break;
+      }
+    }
+    if (videoStream == null) {
+      throw new RuntimeException("No video stream found in: " + videoUrl);
+    }
+
+    String rate = videoStream.get("r_frame_rate").asText();
 
     String[] parts = rate.split("/");
     return Double.parseDouble(parts[0]) / Double.parseDouble(parts[1]);
   }
 
-  private static void generateThumbnails(Path videoPath,
+  private static void generateThumbnails(String videoUrl,
                                          Path outputDir,
                                          int resolution,
                                          int interval,
                                          double fps) throws Exception {
 
     String cmd = String.format(
-        "ffmpeg -i %s -vf \"select='isnan(prev_selected_t)+gte(t-floor(prev_selected_t),%d)',scale=-2:%d,setpts=N/%f/TB\" thumbnail-%%06d.png",
-        videoPath,
+        "ffmpeg -i '%s' -vf \"select='isnan(prev_selected_t)+gte(t-floor(prev_selected_t),%d)',scale=-2:%d,setpts=N/%f/TB\" thumbnail-%%06d.png",
+        videoUrl,
         interval,
         resolution,
         fps

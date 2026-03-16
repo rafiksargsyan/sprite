@@ -18,6 +18,7 @@ import {
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
+import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import SettingsIcon from '@mui/icons-material/Settings';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -28,7 +29,8 @@ const DRAWER_WIDTH = 240;
 
 const NAV_ITEMS = [
   { label: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-  { label: 'Thumbnails', icon: <VideoLibraryIcon />, path: '/thumbnails' },
+  { label: 'Job Specs', icon: <LibraryBooksIcon />, path: '/job-specs' },
+  { label: 'Jobs', icon: <VideoLibraryIcon />, path: '/jobs' },
   { label: 'API Keys', icon: <VpnKeyIcon />, path: '/api-keys' },
   { label: 'Settings', icon: <SettingsIcon />, path: '/settings' },
 ];
