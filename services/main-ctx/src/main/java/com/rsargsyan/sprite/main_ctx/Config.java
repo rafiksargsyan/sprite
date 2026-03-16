@@ -6,7 +6,9 @@ import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.transfer.s3.S3TransferManager;
 
 import java.net.URI;
 
@@ -30,23 +32,33 @@ public class Config {
   @Value("${s3.endpoint}")
   public String s3Endpoint;
 
-  @Value("${s3.bucket")
+  @Value("${s3.bucket}")
   public String s3Bucket;
 
   @Bean
   public S3Client s3Client() {
-
-    AwsBasicCredentials credentials =
-        AwsBasicCredentials.create(
-            s3AccessKeyId,
-            s3SecretAccessKey
-        );
-
     return S3Client.builder()
         .endpointOverride(URI.create(s3Endpoint))
         .region(Region.of(s3Region))
-        .credentialsProvider(
-            StaticCredentialsProvider.create(credentials))
+        .credentialsProvider(StaticCredentialsProvider.create(
+            AwsBasicCredentials.create(s3AccessKeyId, s3SecretAccessKey)))
+        .build();
+  }
+
+  @Bean
+  public S3AsyncClient s3AsyncClient() {
+    return S3AsyncClient.builder()
+        .endpointOverride(URI.create(s3Endpoint))
+        .region(Region.of(s3Region))
+        .credentialsProvider(StaticCredentialsProvider.create(
+            AwsBasicCredentials.create(s3AccessKeyId, s3SecretAccessKey)))
+        .build();
+  }
+
+  @Bean(destroyMethod = "close")
+  public S3TransferManager s3TransferManager(S3AsyncClient s3AsyncClient) {
+    return S3TransferManager.builder()
+        .s3Client(s3AsyncClient)
         .build();
   }
 }

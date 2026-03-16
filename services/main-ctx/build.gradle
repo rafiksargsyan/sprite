@@ -30,6 +30,8 @@ dependencies {
 	implementation 'io.hypersistence:hypersistence-utils-hibernate-63:3.12.0'
 	implementation 'org.springframework.boot:spring-boot-starter-amqp'
 	implementation 'software.amazon.awssdk:s3'
+	implementation 'software.amazon.awssdk:s3-transfer-manager'
+	implementation 'software.amazon.awssdk:netty-nio-client'
 	implementation(platform("software.amazon.awssdk:bom:2.27.21"))
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'

@@ -2,78 +2,46 @@ package com.rsargsyan.sprite.main_ctx.core.app;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.ThumbnailConfig;
+import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.WebpThumbnailConfig;
 
 import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.util.*;
-import java.util.Base64;
 import java.util.stream.Stream;
 
 public class VideoThumbnailGenerator {
 
-  public static void run(String videoFilePath,
-                         String outputFolder,
-                         String resolutionsBase64Encoded) throws Exception {
+  public static void run(String videoFilePath, Path configFolder, ThumbnailConfig config) throws Exception {
 
-    List<Integer> resolutions = decodeResolutions(resolutionsBase64Encoded);
+    Path videoPath = Paths.get(videoFilePath).toAbsolutePath();
+    Files.createDirectories(configFolder);
 
-    Path videoFileAbsolutePath = Paths.get(videoFilePath).toAbsolutePath();
-    Path outputFolderAbsolutePath = Paths.get(outputFolder).toAbsolutePath();
+    double fps = resolveFps(videoPath);
 
-    double fps = resolveFps(videoFileAbsolutePath);
+    generateThumbnails(videoPath, configFolder, config.resolution(), config.interval(), fps);
 
-    for (Integer res : resolutions) {
+    Dimension dim = resolveImageSize(configFolder.resolve("thumbnail-000001.png"));
 
-      int[] spriteSize = resolveSpriteSize(res);
-      int spriteR = spriteSize[0];
-      int spriteC = spriteSize[1];
-      int spriteS = spriteR * spriteC;
+    int thumbnailsCount = countThumbnails(configFolder);
+    int spriteR = config.spriteSize().rows();
+    int spriteC = config.spriteSize().cols();
+    int spriteS = spriteR * spriteC;
 
-      Path resAbsolutePath = outputFolderAbsolutePath.resolve(String.valueOf(res));
-      Files.createDirectories(resAbsolutePath);
+    generateSprites(configFolder, spriteC, spriteR, config);
 
-      generateThumbnails(videoFileAbsolutePath, resAbsolutePath, res, fps);
+    deleteThumbnails(configFolder);
 
-      Dimension dim = resolveImageSize(resAbsolutePath.resolve("thumbnail-000001.png"));
-
-      int width = dim.width;
-      int height = dim.height;
-
-      int thumbnailsCount = countThumbnails(resAbsolutePath);
-
-      generateSprites(resAbsolutePath, spriteC, spriteR);
-
-      deleteThumbnails(resAbsolutePath);
-
-      if (thumbnailsCount <= spriteS) {
-        Files.move(
-            resAbsolutePath.resolve("sprite.jpg"),
-            resAbsolutePath.resolve("sprite-0.jpg"),
-            StandardCopyOption.REPLACE_EXISTING
-        );
-      }
-
-      generateWebVtt(
-          resAbsolutePath,
-          thumbnailsCount,
-          spriteS,
-          spriteC,
-          width,
-          height
+    String spriteExt = config.format();
+    if (thumbnailsCount <= spriteS) {
+      Files.move(
+          configFolder.resolve("sprite." + spriteExt),
+          configFolder.resolve("sprite-0." + spriteExt),
+          StandardCopyOption.REPLACE_EXISTING
       );
     }
-  }
 
-  private static List<Integer> decodeResolutions(String base64) throws Exception {
-
-    byte[] decoded = Base64.getDecoder().decode(base64);
-    String json = new String(decoded, StandardCharsets.UTF_8);
-
-    ObjectMapper mapper = new ObjectMapper();
-    Integer[] arr = mapper.readValue(json, Integer[].class);
-
-    return Arrays.asList(arr);
+    generateWebVtt(configFolder, thumbnailsCount, spriteS, spriteC, dim.width, dim.height,
+        config.interval(), config.format());
   }
 
   private static double resolveFps(Path videoPath) throws Exception {
@@ -92,7 +60,7 @@ public class VideoThumbnailGenerator {
     ObjectMapper mapper = new ObjectMapper();
     JsonNode root = mapper.readTree(json);
 
-    String rate = root.get("streams").get(1).get("r_frame_rate").asText(); // detect stream number
+    String rate = root.get("streams").get(1).get("r_frame_rate").asText();
 
     String[] parts = rate.split("/");
     return Double.parseDouble(parts[0]) / Double.parseDouble(parts[1]);
@@ -101,11 +69,13 @@ public class VideoThumbnailGenerator {
   private static void generateThumbnails(Path videoPath,
                                          Path outputDir,
                                          int resolution,
+                                         int interval,
                                          double fps) throws Exception {
 
     String cmd = String.format(
-        "ffmpeg -i %s -vf \"select='isnan(prev_selected_t)+gte(t-floor(prev_selected_t),1)',scale=-2:%d,setpts=N/%f/TB\" thumbnail-%%06d.png",
+        "ffmpeg -i %s -vf \"select='isnan(prev_selected_t)+gte(t-floor(prev_selected_t),%d)',scale=-2:%d,setpts=N/%f/TB\" thumbnail-%%06d.png",
         videoPath,
+        interval,
         resolution,
         fps
     );
@@ -149,15 +119,23 @@ public class VideoThumbnailGenerator {
     }
   }
 
-  private static void generateSprites(Path dir, int spriteC, int spriteR) throws Exception {
+  private static void generateSprites(Path dir, int spriteC, int spriteR, ThumbnailConfig config) throws Exception {
 
-    String cmd = String.format(
-        "magick montage -quality 18 -geometry +0+0 -tile %dx%d thumbnail-*.png sprite.jpg",
-        spriteC,
-        spriteR
+    StringBuilder cmd = new StringBuilder(
+        String.format("magick montage -quality %d ", config.quality())
     );
 
-    ProcessBuilder pb = new ProcessBuilder("bash", "-c", cmd);
+    if (config instanceof WebpThumbnailConfig webp) {
+      if (webp.lossless()) {
+        cmd.append("-define webp:lossless=true ");
+      }
+      cmd.append(String.format("-define webp:method=%d ", webp.method()));
+    }
+
+    cmd.append(String.format("-geometry +0+0 -tile %dx%d thumbnail-*.png sprite.%s",
+        spriteC, spriteR, config.format()));
+
+    ProcessBuilder pb = new ProcessBuilder("bash", "-c", cmd.toString());
     pb.directory(dir.toFile());
 
     Process p = pb.start();
@@ -179,7 +157,9 @@ public class VideoThumbnailGenerator {
                                      int spriteS,
                                      int spriteC,
                                      int width,
-                                     int height) throws Exception {
+                                     int height,
+                                     int interval,
+                                     String format) throws Exception {
 
     Path vttFile = dir.resolve("thumbnails.vtt");
 
@@ -189,8 +169,8 @@ public class VideoThumbnailGenerator {
 
       int spriteNumber = i / spriteS;
 
-      int start = i;
-      int end = i + 1;
+      int start = i * interval;
+      int end = (i + 1) * interval;
 
       int spritePositionX = (i % spriteC) * width;
       int spritePositionY = ((i % spriteS) / spriteC) * height;
@@ -201,8 +181,9 @@ public class VideoThumbnailGenerator {
           .append("\n");
 
       vtt.append(String.format(
-          "sprite-%d.jpg#xywh=%d,%d,%d,%d\n\n",
+          "sprite-%d.%s#xywh=%d,%d,%d,%d\n\n",
           spriteNumber,
+          format,
           spritePositionX,
           spritePositionY,
           width,
@@ -210,8 +191,7 @@ public class VideoThumbnailGenerator {
       ));
     }
 
-    Files.writeString(vttFile, vtt.toString(),
-        StandardOpenOption.CREATE_NEW);
+    Files.writeString(vttFile, vtt.toString(), StandardOpenOption.CREATE_NEW);
   }
 
   private static String vttTimestamp(int seconds) {
@@ -226,13 +206,6 @@ public class VideoThumbnailGenerator {
     return String.format("%02d:%02d:%02d.%03d", h, m, s, milli);
   }
 
-  private static int[] resolveSpriteSize(int resolution) {
-
-    if (resolution <= 60) return new int[]{8, 8};
-    if (resolution <= 120) return new int[]{5, 5};
-    return new int[]{3, 3};
-  }
-
   static class Dimension {
     int width;
     int height;
@@ -243,4 +216,3 @@ public class VideoThumbnailGenerator {
     }
   }
 }
-
