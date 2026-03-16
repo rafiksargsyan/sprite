@@ -1,36 +1,25 @@
-import { createRoot } from 'react-dom/client'
-import App from './App.tsx'
-import { createTheme, ThemeProvider } from '@mui/material/styles'
-import CssBaseline from '@mui/material/CssBaseline'
-// import { StrictMode } from 'react'
-import { green } from '@mui/material/colors'
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+import '@fontsource/roboto/300.css';
+import '@fontsource/roboto/400.css';
+import '@fontsource/roboto/500.css';
+import '@fontsource/roboto/700.css';
+import App from './App';
 
 const theme = createTheme({
-  components: {
-    MuiButton: {
-      defaultProps: {
-        disableElevation: true,
-      },
-    },
-    MuiPaper: {
-      defaultProps: { 
-        elevation: 0,
-      },
-    },
-  },
   palette: {
-    mode: 'light', 
     primary: {
-      main: green[700],
+      main: '#00A651',
     },
   },
 });
 
 createRoot(document.getElementById('root')!).render(
-  //  <StrictMode>
+  <StrictMode>
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <App />
     </ThemeProvider>
-  //  </StrictMode>
-)
+  </StrictMode>
+);
