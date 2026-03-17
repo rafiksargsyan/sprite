@@ -4,10 +4,13 @@ import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.ApiKey;
 
 import java.time.Instant;
 
-public record ApiKeyDTO(String id, String key, Instant lastAccessTime,
-                        String description) {
+public record ApiKeyDTO(String id, String key, Instant lastAccessTime, String description, boolean disabled) {
   public static ApiKeyDTO from(ApiKey apiKey, String key) {
-    return new ApiKeyDTO(apiKey.getStrId(), key,
-        apiKey.getLastAccessTime(), apiKey.getDescription());
+    return new ApiKeyDTO(apiKey.getStrId(), key, apiKey.getLastAccessTime(),
+        apiKey.getDescription(), apiKey.isDisabled());
+  }
+
+  public static ApiKeyDTO from(ApiKey apiKey) {
+    return from(apiKey, null);
   }
 }

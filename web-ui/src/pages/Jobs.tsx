@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  Alert,
   Box,
   Button,
   Chip,
@@ -8,9 +9,11 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   MenuItem,
   Paper,
   Stack,
+  Switch,
   Table,
   TableBody,
   TableCell,
@@ -18,23 +21,27 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
   Select,
   InputLabel,
   FormControl,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import DownloadIcon from '@mui/icons-material/Download';
 import { useAuth } from '../hooks/useAuth';
-import { listJobs, createJob } from '../api/jobs';
+import { listJobs, createJob, getJobLimits } from '../api/jobs';
 import { listJobSpecs } from '../api/jobSpecs';
 import type { ThumbnailsGenerationJobDTO, JobSpecDTO } from '../types/api.types';
+
+const fmt = (ts: string | null) =>
+  ts ? new Date(ts).toLocaleString() : '—';
 
 const STATUS_COLOR: Record<
   ThumbnailsGenerationJobDTO['status'],
   'default' | 'info' | 'warning' | 'success' | 'error'
 > = {
   SUBMITTED: 'info',
-  QUEUED: 'warning',
   IN_PROGRESS: 'warning',
   SUCCESS: 'success',
   FAILURE: 'error',
@@ -51,6 +58,13 @@ export function Jobs() {
 
   const [videoURL, setVideoURL] = useState('');
   const [jobSpecId, setJobSpecId] = useState('');
+  const [streamIndex, setStreamIndex] = useState('');
+  const [preview, setPreview] = useState(false);
+  const [maxFileSizeBytes, setMaxFileSizeBytes] = useState<number | null>(null);
+
+  useEffect(() => {
+    getJobLimits().then((l) => setMaxFileSizeBytes(l.maxFileSizeBytes)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!user || !accountId) return;
@@ -63,6 +77,8 @@ export function Jobs() {
   const openDialog = () => {
     setVideoURL('');
     setJobSpecId(specs[0]?.id ?? '');
+    setStreamIndex('');
+    setPreview(false);
     setError('');
     setDialogOpen(true);
   };
@@ -72,7 +88,8 @@ export function Jobs() {
     setSaving(true);
     setError('');
     try {
-      const created = await createJob(user, accountId, { videoURL, jobSpecId });
+      const parsedStreamIndex = streamIndex.trim() !== '' ? parseInt(streamIndex, 10) : null;
+      const created = await createJob(user, accountId, { videoURL, jobSpecId, streamIndex: parsedStreamIndex, preview });
       setJobs((prev) => [created, ...prev]);
       setDialogOpen(false);
     } catch (e) {
@@ -110,6 +127,10 @@ export function Jobs() {
                 <TableCell>Video URL</TableCell>
                 <TableCell>Configs</TableCell>
                 <TableCell>Status</TableCell>
+                <TableCell>Created</TableCell>
+                <TableCell>Started</TableCell>
+                <TableCell>Finished</TableCell>
+                <TableCell>Download</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -142,6 +163,39 @@ export function Jobs() {
                       color={STATUS_COLOR[job.status]}
                     />
                   </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" color="text.secondary" noWrap>{fmt(job.createdAt)}</Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" color="text.secondary" noWrap>{fmt(job.startedAt)}</Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" color="text.secondary" noWrap>{fmt(job.finishedAt)}</Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Tooltip title={
+                      job.downloadUrl
+                        ? 'Download sprites as ZIP'
+                        : ['SUCCESS', 'FAILURE'].includes(job.status)
+                          ? 'Download link expired (available for 2 hours after completion)'
+                          : 'Job not finished yet'
+                    }>
+                      <span>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<DownloadIcon />}
+                          disabled={!job.downloadUrl}
+                          href={job.downloadUrl ?? undefined}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          component={job.downloadUrl ? 'a' : 'button'}
+                        >
+                          Download
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -153,6 +207,11 @@ export function Jobs() {
         <DialogTitle>New Job</DialogTitle>
         <DialogContent>
           <Stack spacing={2} mt={1}>
+            {maxFileSizeBytes !== null && (
+              <Alert severity="info">
+                Video file must not exceed {(maxFileSizeBytes / 1_073_741_824).toFixed(0)} GB.
+              </Alert>
+            )}
             <TextField
               label="Video URL"
               value={videoURL}
@@ -173,6 +232,19 @@ export function Jobs() {
                 ))}
               </Select>
             </FormControl>
+            <TextField
+              label="Stream index"
+              value={streamIndex}
+              onChange={(e) => setStreamIndex(e.target.value)}
+              type="number"
+              fullWidth
+              helperText="Optional — leave blank to auto-detect the first video stream"
+              inputProps={{ min: 0 }}
+            />
+            <FormControlLabel
+              control={<Switch checked={preview} onChange={(e) => setPreview(e.target.checked)} />}
+              label="Upload unzipped preview files"
+            />
             {error && <Typography color="error">{error}</Typography>}
           </Stack>
         </DialogContent>

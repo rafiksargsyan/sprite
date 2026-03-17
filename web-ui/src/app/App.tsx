@@ -7,6 +7,7 @@ import { Login } from '../pages/Login';
 import { Dashboard } from '../pages/Dashboard';
 import { JobSpecs } from '../pages/JobSpecs';
 import { Jobs } from '../pages/Jobs';
+import { ApiKeys } from '../pages/ApiKeys';
 
 export default function App() {
   return (
@@ -26,7 +27,7 @@ export default function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/job-specs" element={<JobSpecs />} />
             <Route path="/jobs" element={<Jobs />} />
-            <Route path="/api-keys" element={<ComingSoon title="API Keys" />} />
+            <Route path="/api-keys" element={<ApiKeys />} />
             <Route path="/settings" element={<ComingSoon title="Settings" />} />
           </Route>
           <Route path="*" element={<Navigate to="/login" replace />} />

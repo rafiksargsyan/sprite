@@ -1,3 +1,11 @@
+export interface ApiKeyDTO {
+  id: string;
+  key: string | null;
+  lastAccessTime: string | null;
+  description: string;
+  disabled: boolean;
+}
+
 export interface UserDTO {
   id: string;
   name: string;
@@ -15,6 +23,7 @@ export interface JpgConfigResponse {
   spriteSize: SpriteSizeResponse;
   quality: number;
   interval: number;
+  folderName: string;
 }
 
 export interface WebpConfigResponse {
@@ -25,9 +34,21 @@ export interface WebpConfigResponse {
   method: number;
   lossless: boolean;
   interval: number;
+  preset: string;
+  folderName: string;
 }
 
-export type ThumbnailConfigResponse = JpgConfigResponse | WebpConfigResponse;
+export interface AvifConfigResponse {
+  format: 'avif';
+  resolution: number;
+  spriteSize: SpriteSizeResponse;
+  quality: number;
+  interval: number;
+  speed: number;
+  folderName: string;
+}
+
+export type ThumbnailConfigResponse = JpgConfigResponse | WebpConfigResponse | AvifConfigResponse;
 
 export interface JobSpecDTO {
   id: string;
@@ -47,6 +68,7 @@ export interface JpgConfigRequest {
   spriteSize: SpriteSizeRequest;
   quality: number;
   interval: number;
+  folderName: string;
 }
 
 export interface WebpConfigRequest {
@@ -57,9 +79,21 @@ export interface WebpConfigRequest {
   method: number;
   lossless: boolean;
   interval: number;
+  preset: string;
+  folderName: string;
 }
 
-export type ThumbnailConfigRequest = JpgConfigRequest | WebpConfigRequest;
+export interface AvifConfigRequest {
+  format: 'avif';
+  resolution: number;
+  spriteSize: SpriteSizeRequest;
+  quality: number;
+  interval: number;
+  speed: number;
+  folderName: string;
+}
+
+export type ThumbnailConfigRequest = JpgConfigRequest | WebpConfigRequest | AvifConfigRequest;
 
 export interface JobSpecCreationRequest {
   name: string;
@@ -70,11 +104,23 @@ export interface JobSpecCreationRequest {
 export interface ThumbnailsGenerationJobDTO {
   id: string;
   videoUrl: string;
-  status: 'SUBMITTED' | 'QUEUED' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILURE';
+  status: 'SUBMITTED' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILURE';
   jobSpec: { configs: ThumbnailConfigResponse[] };
+  streamIndex: number | null;
+  preview: boolean;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  downloadUrl: string | null;
 }
 
 export interface ThumbnailsGenerationJobCreationRequest {
   videoURL: string;
   jobSpecId: string;
+  streamIndex?: number | null;
+  preview?: boolean;
+}
+
+export interface JobLimitsDTO {
+  maxFileSizeBytes: number;
 }

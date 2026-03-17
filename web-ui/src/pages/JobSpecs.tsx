@@ -3,6 +3,8 @@ import {
   Box,
   Button,
   Chip,
+  FormControl,
+  InputLabel,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -31,8 +33,10 @@ import { useAuth } from '../hooks/useAuth';
 import { listJobSpecs, createJobSpec } from '../api/jobSpecs';
 import type { JobSpecDTO, ThumbnailConfigRequest } from '../types/api.types';
 
+type WebpPreset = 'default' | 'picture' | 'photo' | 'drawing' | 'icon' | 'text';
+
 interface ConfigDraft {
-  format: 'jpg' | 'webp';
+  format: 'jpg' | 'webp' | 'avif';
   resolution: number;
   spriteRows: number;
   spriteCols: number;
@@ -40,6 +44,9 @@ interface ConfigDraft {
   interval: number;
   method: number;
   lossless: boolean;
+  preset: WebpPreset;
+  speed: number;
+  folderName: string;
 }
 
 const defaultConfig = (): ConfigDraft => ({
@@ -51,14 +58,20 @@ const defaultConfig = (): ConfigDraft => ({
   interval: 10,
   method: 4,
   lossless: false,
+  preset: 'default',
+  speed: 6,
+  folderName: '',
 });
 
 function configDraftToRequest(c: ConfigDraft): ThumbnailConfigRequest {
   const spriteSize = { rows: c.spriteRows, cols: c.spriteCols };
   if (c.format === 'jpg') {
-    return { format: 'jpg', resolution: c.resolution, spriteSize, quality: c.quality, interval: c.interval };
+    return { format: 'jpg', resolution: c.resolution, spriteSize, quality: c.quality, interval: c.interval, folderName: c.folderName };
   }
-  return { format: 'webp', resolution: c.resolution, spriteSize, quality: c.quality, interval: c.interval, method: c.method, lossless: c.lossless };
+  if (c.format === 'avif') {
+    return { format: 'avif', resolution: c.resolution, spriteSize, quality: c.quality, interval: c.interval, speed: c.speed, folderName: c.folderName };
+  }
+  return { format: 'webp', resolution: c.resolution, spriteSize, quality: c.quality, interval: c.interval, method: c.method, lossless: c.lossless, preset: c.preset, folderName: c.folderName };
 }
 
 export function JobSpecs() {
@@ -182,15 +195,24 @@ export function JobSpecs() {
                       <DeleteIcon fontSize="small" />
                     </IconButton>
                   </Stack>
+                  <TextField
+                    size="small"
+                    label="Folder name"
+                    value={cfg.folderName}
+                    onChange={(e) => updateConfig(i, { folderName: e.target.value })}
+                    fullWidth
+                    helperText="1–63 chars: letters, digits, hyphens, underscores, periods"
+                  />
                   <Stack direction="row" spacing={2} flexWrap="wrap">
                     <Select
                       size="small"
                       value={cfg.format}
-                      onChange={(e) => updateConfig(i, { format: e.target.value as 'jpg' | 'webp', quality: e.target.value === 'jpg' ? 85 : 75 })}
+                      onChange={(e) => updateConfig(i, { format: e.target.value as 'jpg' | 'webp' | 'avif', quality: e.target.value === 'jpg' ? 85 : 60 })}
                       sx={{ minWidth: 90 }}
                     >
                       <MenuItem value="jpg">JPG</MenuItem>
                       <MenuItem value="webp">WebP</MenuItem>
+                      <MenuItem value="avif">AVIF</MenuItem>
                     </Select>
                     <TextField size="small" label="Resolution (px height)" type="number" value={cfg.resolution}
                       onChange={(e) => updateConfig(i, { resolution: +e.target.value })} sx={{ width: 160 }} />
@@ -202,17 +224,35 @@ export function JobSpecs() {
                       onChange={(e) => updateConfig(i, { spriteRows: +e.target.value })} sx={{ width: 100 }} />
                     <TextField size="small" label="Sprite cols" type="number" value={cfg.spriteCols}
                       onChange={(e) => updateConfig(i, { spriteCols: +e.target.value })} sx={{ width: 100 }} />
-                    {cfg.format === 'webp' && (
-                      <>
-                        <TextField size="small" label="Method (0–6)" type="number" value={cfg.method}
-                          onChange={(e) => updateConfig(i, { method: +e.target.value })} sx={{ width: 110 }} />
-                        <FormControlLabel
-                          control={<Switch checked={cfg.lossless} onChange={(e) => updateConfig(i, { lossless: e.target.checked })} />}
-                          label="Lossless"
-                        />
-                      </>
-                    )}
                   </Stack>
+                  {cfg.format === 'avif' && (
+                    <Stack direction="row" spacing={2} flexWrap="wrap" alignItems="center">
+                      <TextField size="small" label="Speed (0–8)" type="number" value={cfg.speed}
+                        onChange={(e) => updateConfig(i, { speed: +e.target.value })} sx={{ width: 110 }} />
+                    </Stack>
+                  )}
+                  {cfg.format === 'webp' && (
+                    <Stack direction="row" spacing={2} flexWrap="wrap" alignItems="center">
+                      <FormControl size="small" sx={{ minWidth: 110 }}>
+                        <InputLabel>Preset</InputLabel>
+                        <Select
+                          label="Preset"
+                          value={cfg.preset}
+                          onChange={(e) => updateConfig(i, { preset: e.target.value as WebpPreset })}
+                        >
+                          {(['default', 'picture', 'photo', 'drawing', 'icon', 'text'] as WebpPreset[]).map((p) => (
+                            <MenuItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                      <TextField size="small" label="Method (0–6)" type="number" value={cfg.method}
+                        onChange={(e) => updateConfig(i, { method: +e.target.value })} sx={{ width: 110 }} />
+                      <FormControlLabel
+                        control={<Switch checked={cfg.lossless} onChange={(e) => updateConfig(i, { lossless: e.target.checked })} />}
+                        label="Lossless"
+                      />
+                    </Stack>
+                  )}
                 </Stack>
               </Paper>
             ))}
@@ -222,7 +262,7 @@ export function JobSpecs() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSave} disabled={saving || !name.trim()}>
+          <Button variant="contained" onClick={handleSave} disabled={saving || !name.trim() || configs.some((c) => !c.folderName.trim())}>
             {saving ? <CircularProgress size={20} /> : 'Create'}
           </Button>
         </DialogActions>

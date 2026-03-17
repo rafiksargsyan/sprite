@@ -2,8 +2,10 @@ package com.rsargsyan.sprite.main_ctx.core.app;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.AvifThumbnailConfig;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.ThumbnailConfig;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.WebpThumbnailConfig;
+import com.rsargsyan.sprite.main_ctx.core.exception.InvalidThumbnailConfigException;
 
 import java.io.*;
 import java.nio.file.*;
@@ -11,13 +13,13 @@ import java.util.stream.Stream;
 
 public class VideoThumbnailGenerator {
 
-  public static void run(String videoFilePath, Path configFolder, ThumbnailConfig config) throws Exception {
+  public static void run(String videoFilePath, Path configFolder, ThumbnailConfig config, Integer streamIndex) throws Exception {
 
     Files.createDirectories(configFolder);
 
-    double fps = resolveFps(videoFilePath);
+    double fps = resolveFps(videoFilePath, streamIndex);
 
-    generateThumbnails(videoFilePath, configFolder, config.resolution(), config.interval(), fps);
+    generateThumbnails(videoFilePath, configFolder, config.resolution(), config.interval(), fps, streamIndex);
 
     Dimension dim = resolveImageSize(configFolder.resolve("thumbnail-000001.png"));
 
@@ -43,7 +45,7 @@ public class VideoThumbnailGenerator {
         config.interval(), config.format());
   }
 
-  private static double resolveFps(String videoUrl) throws Exception {
+  private static double resolveFps(String videoUrl, Integer streamIndex) throws Exception {
 
     ProcessBuilder pb = new ProcessBuilder(
         "ffprobe",
@@ -68,20 +70,31 @@ public class VideoThumbnailGenerator {
       throw new RuntimeException("ffprobe returned no streams for: " + videoUrl);
     }
 
-    JsonNode videoStream = null;
-    for (JsonNode stream : streams) {
-      JsonNode codecType = stream.get("codec_type");
-      if (codecType != null && "video".equals(codecType.asText())) {
-        videoStream = stream;
-        break;
+    JsonNode videoStream;
+    if (streamIndex != null) {
+      if (streamIndex >= streams.size()) {
+        throw new InvalidThumbnailConfigException(
+            "Stream index " + streamIndex + " does not exist (video has " + streams.size() + " streams)");
       }
-    }
-    if (videoStream == null) {
-      throw new RuntimeException("No video stream found in: " + videoUrl);
+      videoStream = streams.get(streamIndex);
+      if (!"video".equals(videoStream.path("codec_type").asText())) {
+        throw new InvalidThumbnailConfigException(
+            "Stream " + streamIndex + " is not a video stream (codec_type: " + videoStream.path("codec_type").asText() + ")");
+      }
+    } else {
+      videoStream = null;
+      for (JsonNode stream : streams) {
+        if ("video".equals(stream.path("codec_type").asText())) {
+          videoStream = stream;
+          break;
+        }
+      }
+      if (videoStream == null) {
+        throw new RuntimeException("No video stream found in: " + videoUrl);
+      }
     }
 
     String rate = videoStream.get("r_frame_rate").asText();
-
     String[] parts = rate.split("/");
     return Double.parseDouble(parts[0]) / Double.parseDouble(parts[1]);
   }
@@ -90,10 +103,12 @@ public class VideoThumbnailGenerator {
                                          Path outputDir,
                                          int resolution,
                                          int interval,
-                                         double fps) throws Exception {
+                                         double fps,
+                                         Integer streamIndex) throws Exception {
 
+    String mapFlag = streamIndex != null ? "-map 0:" + streamIndex + " " : "";
     String cmd = String.format(
-        "ffmpeg -i '%s' -vf \"select='isnan(prev_selected_t)+gte(t-floor(prev_selected_t),%d)',scale=-2:%d,setpts=N/%f/TB\" thumbnail-%%06d.png",
+        "ffmpeg -i '%s' " + mapFlag + "-vf \"select='isnan(prev_selected_t)+gte(t-floor(prev_selected_t),%d)',scale=-2:%d,setpts=N/%f/TB\" thumbnail-%%06d.png",
         videoUrl,
         interval,
         resolution,
@@ -141,25 +156,27 @@ public class VideoThumbnailGenerator {
 
   private static void generateSprites(Path dir, int spriteC, int spriteR, ThumbnailConfig config) throws Exception {
 
-    StringBuilder cmd = new StringBuilder(
-        String.format("magick montage -quality %d ", config.quality())
-    );
+    // Step 1: build montage as PNG (avoids animated WebP when writing multi-sprite output)
+    String montageCmd = String.format(
+        "magick montage -geometry +0+0 -tile %dx%d thumbnail-*.png sprite.png",
+        spriteC, spriteR);
+    new ProcessBuilder("bash", "-c", montageCmd).directory(dir.toFile()).start().waitFor();
 
+    // Step 2: convert each sprite PNG to the target format individually
+    StringBuilder convertFlags = new StringBuilder();
+    convertFlags.append(String.format("-quality %d ", config.quality()));
     if (config instanceof WebpThumbnailConfig webp) {
-      if (webp.lossless()) {
-        cmd.append("-define webp:lossless=true ");
-      }
-      cmd.append(String.format("-define webp:method=%d ", webp.method()));
+      convertFlags.append(String.format("-define webp:preset=%s ", webp.preset()));
+      if (webp.lossless()) convertFlags.append("-define webp:lossless=true ");
+      convertFlags.append(String.format("-define webp:method=%d ", webp.method()));
+    } else if (config instanceof AvifThumbnailConfig avif) {
+      convertFlags.append(String.format("-define avif:speed=%d ", avif.speed()));
     }
 
-    cmd.append(String.format("-geometry +0+0 -tile %dx%d thumbnail-*.png sprite.%s",
-        spriteC, spriteR, config.format()));
-
-    ProcessBuilder pb = new ProcessBuilder("bash", "-c", cmd.toString());
-    pb.directory(dir.toFile());
-
-    Process p = pb.start();
-    p.waitFor();
+    String convertCmd = String.format(
+        "for f in sprite*.png; do magick \"$f\" %s\"${f%%.png}.%s\" && rm \"$f\"; done",
+        convertFlags, config.format());
+    new ProcessBuilder("bash", "-c", convertCmd).directory(dir.toFile()).start().waitFor();
   }
 
   private static void deleteThumbnails(Path dir) throws IOException {

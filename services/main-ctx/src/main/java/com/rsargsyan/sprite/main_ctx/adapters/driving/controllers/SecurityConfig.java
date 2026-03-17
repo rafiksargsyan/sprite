@@ -35,7 +35,8 @@ public class SecurityConfig {
     return http
         .cors(cors -> cors.configurationSource(corsConfigurationSource()))
         .csrf(AbstractHttpConfigurer::disable)
-        .authorizeHttpRequests(auth -> auth.requestMatchers("/error").permitAll()
+        .authorizeHttpRequests(auth -> auth
+            .requestMatchers("/error", "/swagger-ui/**", "/v3/api-docs/**", "/thumbnails-generation-job/limits").permitAll()
             .anyRequest().authenticated())
         .authenticationProvider(apiKeyAuthenticationProvider)
         .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))

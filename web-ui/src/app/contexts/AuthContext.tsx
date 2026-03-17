@@ -28,6 +28,7 @@ const ACTION_CODE_SETTINGS = {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [pendingEmailConfirmation, setPendingEmailConfirmation] = useState(false);
@@ -39,11 +40,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (firebaseUser) {
         try {
           const dto = await signUpExternal(firebaseUser);
+          setUserId(dto.id);
           setAccountId(dto.accountId);
         } catch {
+          setUserId(null);
           setAccountId(null);
         }
       } else {
+        setUserId(null);
         setAccountId(null);
       }
       setLoading(false);
@@ -100,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        userId,
         accountId,
         loading,
         pendingEmailConfirmation,

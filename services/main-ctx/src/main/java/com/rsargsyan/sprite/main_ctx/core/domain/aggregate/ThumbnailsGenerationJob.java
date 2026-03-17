@@ -1,6 +1,7 @@
 package com.rsargsyan.sprite.main_ctx.core.domain.aggregate;
 
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.EmbeddedJobSpec;
+import com.rsargsyan.sprite.main_ctx.core.exception.InvalidThumbnailConfigException;
 import com.rsargsyan.sprite.main_ctx.core.exception.MalformedUrlException;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.Column;
@@ -12,6 +13,7 @@ import org.hibernate.annotations.Type;
 
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.time.Instant;
 
 @Entity
 @Getter
@@ -26,15 +28,27 @@ public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
   @Column(columnDefinition = "jsonb", name = "job_spec")
   private EmbeddedJobSpec jobSpec;
 
+  private Integer streamIndex;
+
+  private boolean preview;
+
   private String failureReason;
+
+  private Instant startedAt;
+
+  private Instant finishedAt;
 
   @SuppressWarnings("unused")
   ThumbnailsGenerationJob() {}
 
-  public ThumbnailsGenerationJob(Account account, String videoURL, EmbeddedJobSpec jobSpec) {
+  public ThumbnailsGenerationJob(Account account, String videoURL, EmbeddedJobSpec jobSpec, Integer streamIndex, boolean preview) {
     super(account);
+    if (streamIndex != null && streamIndex < 0)
+      throw new InvalidThumbnailConfigException("Stream index must be a non-negative integer");
     this.status = Status.SUBMITTED;
     this.jobSpec = jobSpec;
+    this.streamIndex = streamIndex;
+    this.preview = preview;
     try {
       this.videoURL = new URL(videoURL);
     } catch (MalformedURLException e) {
@@ -55,6 +69,7 @@ public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
       throw new RuntimeException("Must be in queued state");
     }
     this.status = Status.IN_PROGRESS;
+    this.startedAt = Instant.now();
     touch();
   }
 
@@ -63,12 +78,14 @@ public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
       throw new RuntimeException("Must be in in_progress state");
     }
     this.status = Status.SUCCESS;
+    this.finishedAt = Instant.now();
     touch();
   }
 
   public void fail(String reason) {
     this.status = Status.FAILURE;
     this.failureReason = reason;
+    this.finishedAt = Instant.now();
     touch();
   }
 

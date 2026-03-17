@@ -1,6 +1,7 @@
 package com.rsargsyan.sprite.main_ctx.core.app.dto;
 
 import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.JobSpec;
+import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.AvifThumbnailConfig;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.JpgThumbnailConfig;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.ThumbnailConfig;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.WebpThumbnailConfig;
@@ -27,11 +28,15 @@ public class JobSpecDTO {
   private static ThumbnailConfigResponse toResponse(ThumbnailConfig config) {
     if (config instanceof JpgThumbnailConfig c) {
       return new JpgThumbnailConfigResponse(
-          c.resolution(), new SpriteSizeResponse(c.spriteSize().rows(), c.spriteSize().cols()), c.quality(), c.interval()
+          c.resolution(), new SpriteSizeResponse(c.spriteSize().rows(), c.spriteSize().cols()), c.quality(), c.interval(), c.folderName()
       );
     } else if (config instanceof WebpThumbnailConfig c) {
       return new WebpThumbnailConfigResponse(
-          c.resolution(), new SpriteSizeResponse(c.spriteSize().rows(), c.spriteSize().cols()), c.quality(), c.method(), c.lossless(), c.interval()
+          c.resolution(), new SpriteSizeResponse(c.spriteSize().rows(), c.spriteSize().cols()), c.quality(), c.method(), c.lossless(), c.interval(), c.preset(), c.folderName()
+      );
+    } else if (config instanceof AvifThumbnailConfig c) {
+      return new AvifThumbnailConfigResponse(
+          c.resolution(), new SpriteSizeResponse(c.spriteSize().rows(), c.spriteSize().cols()), c.quality(), c.interval(), c.speed(), c.folderName()
       );
     }
     throw new IllegalStateException("Unknown config type: " + config.getClass());

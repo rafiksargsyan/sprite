@@ -4,6 +4,7 @@ import com.rsargsyan.sprite.main_ctx.core.Util;
 import com.rsargsyan.sprite.main_ctx.core.app.dto.*;
 import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.JobSpec;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.*;
+import com.rsargsyan.sprite.main_ctx.core.exception.InvalidThumbnailConfigException;
 import com.rsargsyan.sprite.main_ctx.core.exception.ResourceNotFoundException;
 import com.rsargsyan.sprite.main_ctx.core.ports.repository.AccountRepository;
 import com.rsargsyan.sprite.main_ctx.core.ports.repository.JobSpecRepository;
@@ -29,6 +30,8 @@ public class JobSpecService {
   public JobSpecDTO create(String accountId, JobSpecCreationDTO dto) {
     var account = accountRepository.findById(Util.validateTSID(accountId))
         .orElseThrow(ResourceNotFoundException::new);
+    if (jobSpecRepository.existsByAccountIdAndName(account.getId(), dto.getName().trim()))
+      throw new InvalidThumbnailConfigException("A job spec with this name already exists");
     var configs = dto.getConfigs().stream().map(JobSpecService::toConfig).toList();
     var jobSpec = new JobSpec(account, dto.getName(), dto.getDescription(), configs);
     jobSpecRepository.save(jobSpec);
@@ -49,9 +52,11 @@ public class JobSpecService {
 
   private static ThumbnailConfig toConfig(ThumbnailConfigRequest req) {
     if (req instanceof JpgThumbnailConfigRequest r) {
-      return new JpgThumbnailConfig(r.resolution(), toSpriteSize(r.spriteSize()), r.quality(), r.interval());
+      return new JpgThumbnailConfig(r.resolution(), toSpriteSize(r.spriteSize()), r.quality(), r.interval(), r.folderName());
     } else if (req instanceof WebpThumbnailConfigRequest r) {
-      return new WebpThumbnailConfig(r.resolution(), toSpriteSize(r.spriteSize()), r.quality(), r.method(), r.lossless(), r.interval());
+      return new WebpThumbnailConfig(r.resolution(), toSpriteSize(r.spriteSize()), r.quality(), r.method(), r.lossless(), r.interval(), r.preset(), r.folderName());
+    } else if (req instanceof AvifThumbnailConfigRequest r) {
+      return new AvifThumbnailConfig(r.resolution(), toSpriteSize(r.spriteSize()), r.quality(), r.interval(), r.speed(), r.folderName());
     }
     throw new IllegalStateException("Unknown config type: " + req.getClass());
   }

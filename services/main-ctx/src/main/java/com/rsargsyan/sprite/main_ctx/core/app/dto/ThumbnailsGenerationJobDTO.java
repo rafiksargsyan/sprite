@@ -5,6 +5,7 @@ import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.EmbeddedJobSpec;
 import lombok.Value;
 
 import java.net.URL;
+import java.time.Instant;
 
 @Value
 public class ThumbnailsGenerationJobDTO {
@@ -12,10 +13,21 @@ public class ThumbnailsGenerationJobDTO {
   URL videoUrl;
   String status;
   EmbeddedJobSpec jobSpec;
+  Integer streamIndex;
+  boolean preview;
+  Instant createdAt;
+  Instant startedAt;
+  Instant finishedAt;
+  String downloadUrl;
 
-  public static ThumbnailsGenerationJobDTO from(ThumbnailsGenerationJob job) {
+  public static ThumbnailsGenerationJobDTO from(ThumbnailsGenerationJob job, String downloadUrl) {
     return new ThumbnailsGenerationJobDTO(
-        job.getStrId(), job.getVideoURL(), job.getStatus().name(), job.getJobSpec()
+        job.getStrId(), job.getVideoURL(), externalStatus(job.getStatus()), job.getJobSpec(),
+        job.getStreamIndex(), job.isPreview(), job.getCreatedAt(), job.getStartedAt(), job.getFinishedAt(), downloadUrl
     );
+  }
+
+  private static String externalStatus(ThumbnailsGenerationJob.Status status) {
+    return status == ThumbnailsGenerationJob.Status.QUEUED ? "SUBMITTED" : status.name();
   }
 }

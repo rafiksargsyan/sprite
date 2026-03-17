@@ -3,6 +3,7 @@ package com.rsargsyan.sprite.main_ctx.core.app;
 import com.rsargsyan.sprite.main_ctx.Config;
 import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.ThumbnailsGenerationJob;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.ThumbnailConfig;
+import com.rsargsyan.sprite.main_ctx.core.exception.VideoFileTooLargeException;
 import com.rsargsyan.sprite.main_ctx.core.ports.repository.ThumbnailsGenerationJobRepository;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,9 +16,14 @@ import software.amazon.awssdk.transfer.s3.model.UploadFileRequest;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Comparator;
+import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -67,19 +73,38 @@ public class ApplicationEventListener {
     Path zipFile = Paths.get(BASE_OUTPUT_FOLDER).resolve(jobId + ".zip");
 
     try {
-      for (ThumbnailConfig cfg : job.getJobSpec().configs()) {
-        Path configFolder = jobFolder.resolve(cfg.subfolderName());
-        VideoThumbnailGenerator.run(job.getVideoURL().toString(), configFolder, cfg);
+      List<ThumbnailConfig> configs = job.getJobSpec().configs();
+      String videoUrl = job.getVideoURL().toString();
+
+      checkFileSize(videoUrl);
+
+      String videoPath;
+      if (configs.size() > 1 && hasSufficientDiskSpace()) {
+        Files.createDirectories(jobFolder);
+        videoPath = downloadVideo(videoUrl, jobFolder).toString();
+      } else {
+        videoPath = videoUrl;
+      }
+
+      for (ThumbnailConfig cfg : configs) {
+        Path configFolder = jobFolder.resolve(cfg.folderName());
+        VideoThumbnailGenerator.run(videoPath, configFolder, cfg, job.getStreamIndex());
       }
 
       zipDirectory(jobFolder, zipFile);
 
-      s3TransferManager.uploadDirectory(UploadDirectoryRequest.builder()
-          .source(jobFolder)
-          .bucket(config.s3Bucket)
-          .s3Prefix(jobId)
-          .build()
-      ).completionFuture().join();
+      if (job.isPreview()) {
+        try {
+          s3TransferManager.uploadDirectory(UploadDirectoryRequest.builder()
+              .source(jobFolder)
+              .bucket(config.s3Bucket)
+              .s3Prefix(jobId)
+              .build()
+          ).completionFuture().join();
+        } catch (Exception ignored) {
+          // Directory upload is best-effort; zip upload is the source of truth
+        }
+      }
 
       s3TransferManager.uploadFile(UploadFileRequest.builder()
           .source(zipFile)
@@ -97,6 +122,43 @@ public class ApplicationEventListener {
       deleteRecursively(jobFolder);
       try { Files.deleteIfExists(zipFile); } catch (IOException ignored) {}
     }
+  }
+
+  private void checkFileSize(String videoUrl) {
+    try {
+      var client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
+      var request = HttpRequest.newBuilder()
+          .method("HEAD", HttpRequest.BodyPublishers.noBody())
+          .uri(URI.create(videoUrl))
+          .build();
+      var response = client.send(request, HttpResponse.BodyHandlers.discarding());
+      response.headers().firstValueAsLong("content-length").ifPresent(size -> {
+        if (size > config.maxVideoFileSizeBytes) {
+          throw new VideoFileTooLargeException(size, config.maxVideoFileSizeBytes);
+        }
+      });
+    } catch (VideoFileTooLargeException e) {
+      throw e;
+    } catch (Exception ignored) {
+      // Can't determine size — proceed and let processing fail naturally if needed
+    }
+  }
+
+  private boolean hasSufficientDiskSpace() {
+    try {
+      long freeSpace = Files.getFileStore(Paths.get(BASE_OUTPUT_FOLDER)).getUsableSpace();
+      return freeSpace >= config.minFreeDiskSpaceBytes;
+    } catch (IOException e) {
+      return false;
+    }
+  }
+
+  private static Path downloadVideo(String videoUrl, Path jobFolder) throws Exception {
+    Path videoFile = jobFolder.resolve("video");
+    var client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
+    var request = HttpRequest.newBuilder().uri(URI.create(videoUrl)).build();
+    client.send(request, HttpResponse.BodyHandlers.ofFile(videoFile));
+    return videoFile;
   }
 
   private static void zipDirectory(Path source, Path target) throws IOException {

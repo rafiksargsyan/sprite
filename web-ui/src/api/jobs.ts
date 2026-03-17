@@ -3,6 +3,7 @@ import { apiRequest } from './client';
 import type {
   ThumbnailsGenerationJobCreationRequest,
   ThumbnailsGenerationJobDTO,
+  JobLimitsDTO,
 } from '../types/api.types';
 
 export function listJobs(
@@ -22,4 +23,11 @@ export function createJob(
     accountId,
     body: JSON.stringify(body),
   });
+}
+
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
+
+export async function getJobLimits(): Promise<JobLimitsDTO> {
+  const response = await fetch(`${BASE_URL}/thumbnails-generation-job/limits`);
+  return response.json();
 }

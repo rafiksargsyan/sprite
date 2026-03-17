@@ -6,4 +6,6 @@ import lombok.Value;
 public class ThumbnailsGenerationJobCreationDTO {
   String videoURL;
   String jobSpecId;
+  Integer streamIndex;
+  boolean preview;
 }

@@ -97,24 +97,36 @@ export function Login() {
 
           <Button
             fullWidth
-            variant="outlined"
+            variant="contained"
             size="large"
-            startIcon={loadingGoogle ? <CircularProgress size={18} /> : <GoogleIcon />}
+            disableElevation
+            startIcon={loadingGoogle ? <CircularProgress size={18} color="inherit" /> : <GoogleIcon />}
             onClick={handleGoogle}
             disabled={anyLoading}
-            sx={{ mb: 1.5 }}
+            sx={{
+              mb: 1.5,
+              bgcolor: '#db4437',
+              '&:hover': { bgcolor: '#c53929' },
+              '&.Mui-disabled': { bgcolor: '#db4437', opacity: 0.5 },
+            }}
           >
             Continue with Google
           </Button>
 
           <Button
             fullWidth
-            variant="outlined"
+            variant="contained"
             size="large"
-            startIcon={loadingGithub ? <CircularProgress size={18} /> : <GitHubIcon />}
+            disableElevation
+            startIcon={loadingGithub ? <CircularProgress size={18} color="inherit" /> : <GitHubIcon />}
             onClick={handleGithub}
             disabled={anyLoading}
-            sx={{ mb: 2 }}
+            sx={{
+              mb: 2,
+              bgcolor: '#24292f',
+              '&:hover': { bgcolor: '#3a4048' },
+              '&.Mui-disabled': { bgcolor: '#24292f', opacity: 0.5 },
+            }}
           >
             Continue with GitHub
           </Button>
@@ -145,6 +157,7 @@ export function Login() {
                 fullWidth
                 variant="contained"
                 size="large"
+                disableElevation
                 startIcon={
                   loadingEmail ? <CircularProgress size={18} color="inherit" /> : <EmailIcon />
                 }

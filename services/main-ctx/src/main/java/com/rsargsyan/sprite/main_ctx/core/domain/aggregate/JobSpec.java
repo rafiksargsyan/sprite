@@ -6,6 +6,8 @@ import com.rsargsyan.sprite.main_ctx.core.exception.InvalidThumbnailConfigExcept
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import org.hibernate.annotations.Type;
 
@@ -14,6 +16,7 @@ import java.util.List;
 
 @Entity
 @Getter
+@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"account_id", "name"}))
 public class JobSpec extends AccountScopedAggregateRoot {
   private static final int MAX_NAME_LENGTH = 127;
   private static final int MAX_DESCRIPTION_LENGTH = 255;
@@ -37,6 +40,8 @@ public class JobSpec extends AccountScopedAggregateRoot {
     if (configs == null || configs.isEmpty()) throw new InvalidThumbnailConfigException("At least one config is required");
     if (configs.size() > MAX_CONFIGS) throw new InvalidThumbnailConfigException("Job spec cannot have more than %d configs".formatted(MAX_CONFIGS));
     if (configs.size() != new HashSet<>(configs).size()) throw new InvalidThumbnailConfigException("Job spec cannot contain duplicate configs");
+    var folderNames = configs.stream().map(ThumbnailConfig::folderName).toList();
+    if (folderNames.size() != new HashSet<>(folderNames).size()) throw new InvalidThumbnailConfigException("Job spec cannot contain configs with duplicate folder names");
     this.name = name.trim();
     this.description = description;
     this.configs = List.copyOf(configs);

@@ -7,6 +7,7 @@ import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.Account;
 import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.ApiKey;
 import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.Principal;
 import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.UserProfile;
+import com.rsargsyan.sprite.main_ctx.core.exception.ApiKeyNotDisabledException;
 import com.rsargsyan.sprite.main_ctx.core.exception.AuthorizationException;
 import com.rsargsyan.sprite.main_ctx.core.exception.ResourceNotFoundException;
 import com.rsargsyan.sprite.main_ctx.core.ports.repository.AccountRepository;
@@ -24,9 +25,10 @@ import java.util.Optional;
 @Service
 public class UserService {
 
-  private UserProfileRepository userProfileRepository;
-  private AccountRepository accountRepository;
-  private PrincipalRepository principalRepository;
+  private final UserProfileRepository userProfileRepository;
+  private final AccountRepository accountRepository;
+  private final PrincipalRepository principalRepository;
+  private final ApiKeyRepository apiKeyRepository;
 
   @Autowired
   public UserService(UserProfileRepository userProfileRepository, AccountRepository accountRepository,
@@ -34,6 +36,14 @@ public class UserService {
     this.userProfileRepository = userProfileRepository;
     this.accountRepository = accountRepository;
     this.principalRepository = principalRepository;
+    this.apiKeyRepository = apiKeyRepository;
+  }
+
+  public List<ApiKeyDTO> listApiKeys(String actingUserId, String userProfileIdStr) {
+    Long userProfileId = Util.validateTSID(userProfileIdStr);
+    if (!userProfileIdStr.equals(actingUserId)) throw new AuthorizationException();
+    return apiKeyRepository.findByUserProfileId(userProfileId)
+        .stream().map(ApiKeyDTO::from).toList();
   }
 
   public ApiKeyDTO createApiKey(String actingUserId, String userProfileIdStr, String description) {
@@ -44,6 +54,41 @@ public class UserService {
     this.userProfileRepository.save(userProfile);
     ApiKey apiKey = userProfile.getApiKeyByKey(key);
     return ApiKeyDTO.from(apiKey, key);
+  }
+
+  @Transactional
+  public ApiKeyDTO disableApiKey(String actingUserId, String userProfileIdStr, String apiKeyIdStr) {
+    Long userProfileId = Util.validateTSID(userProfileIdStr);
+    Long apiKeyId = Util.validateTSID(apiKeyIdStr);
+    if (!userProfileIdStr.equals(actingUserId)) throw new AuthorizationException();
+    ApiKey apiKey = apiKeyRepository.findByIdAndUserProfileId(apiKeyId, userProfileId)
+        .orElseThrow(ResourceNotFoundException::new);
+    apiKey.disable();
+    apiKeyRepository.save(apiKey);
+    return ApiKeyDTO.from(apiKey);
+  }
+
+  @Transactional
+  public ApiKeyDTO enableApiKey(String actingUserId, String userProfileIdStr, String apiKeyIdStr) {
+    Long userProfileId = Util.validateTSID(userProfileIdStr);
+    Long apiKeyId = Util.validateTSID(apiKeyIdStr);
+    if (!userProfileIdStr.equals(actingUserId)) throw new AuthorizationException();
+    ApiKey apiKey = apiKeyRepository.findByIdAndUserProfileId(apiKeyId, userProfileId)
+        .orElseThrow(ResourceNotFoundException::new);
+    apiKey.enable();
+    apiKeyRepository.save(apiKey);
+    return ApiKeyDTO.from(apiKey);
+  }
+
+  @Transactional
+  public void deleteApiKey(String actingUserId, String userProfileIdStr, String apiKeyIdStr) {
+    Long userProfileId = Util.validateTSID(userProfileIdStr);
+    Long apiKeyId = Util.validateTSID(apiKeyIdStr);
+    if (!userProfileIdStr.equals(actingUserId)) throw new AuthorizationException();
+    ApiKey apiKey = apiKeyRepository.findByIdAndUserProfileId(apiKeyId, userProfileId)
+        .orElseThrow(ResourceNotFoundException::new);
+    if (!apiKey.isDisabled()) throw new ApiKeyNotDisabledException();
+    apiKeyRepository.deleteById(apiKeyId);
   }
 
   @Transactional

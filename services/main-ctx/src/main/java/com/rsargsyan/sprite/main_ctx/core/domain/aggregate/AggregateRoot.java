@@ -17,6 +17,10 @@ public abstract class AggregateRoot {
   @Version
   private Long version;
 
+  @Column(name = "created_at", updatable = false)
+  @Getter
+  private Instant createdAt;
+
   @Column(name = "updated_at")
   @Getter
   private Instant updatedAt;
@@ -24,7 +28,8 @@ public abstract class AggregateRoot {
   private Integer localEntityCounter = 0;
 
   protected AggregateRoot() {
-    this.updatedAt = Instant.now();
+    this.createdAt = Instant.now();
+    this.updatedAt = this.createdAt;
   }
 
   public String getStrId() {
