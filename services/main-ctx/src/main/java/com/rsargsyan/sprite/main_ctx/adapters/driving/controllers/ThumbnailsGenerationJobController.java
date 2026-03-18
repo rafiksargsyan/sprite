@@ -4,11 +4,11 @@ import com.rsargsyan.sprite.main_ctx.core.app.dto.ThumbnailsGenerationJobCreatio
 import com.rsargsyan.sprite.main_ctx.core.app.dto.ThumbnailsGenerationJobDTO;
 import com.rsargsyan.sprite.main_ctx.core.app.ThumbnailsGenerationJobService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -23,9 +23,12 @@ public class ThumbnailsGenerationJobController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ThumbnailsGenerationJobDTO>> findAll() {
+    public ResponseEntity<Page<ThumbnailsGenerationJobDTO>> findAll(
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size
+    ) {
         var userCtx = UserContextHolder.get();
-        return ResponseEntity.ok(thumbnailsGenerationJobService.findAll(userCtx.getAccountId()));
+        return ResponseEntity.ok(thumbnailsGenerationJobService.findAll(userCtx.getAccountId(), page, size));
     }
 
     @GetMapping("/{id}")

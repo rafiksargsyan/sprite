@@ -20,7 +20,7 @@ import java.util.List;
 public class JobSpec extends AccountScopedAggregateRoot {
   private static final int MAX_NAME_LENGTH = 127;
   private static final int MAX_DESCRIPTION_LENGTH = 255;
-  private static final int MAX_CONFIGS = 10;
+  private static final int MAX_CONFIGS = 5;
 
   private String name;
   private String description;

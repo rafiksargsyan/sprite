@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+  <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="main-ctx"/>
+
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <!-- Application logs -->
+  <logger name="com.rsargsyan.sprite" level="DEBUG" additivity="false">
+    <appender-ref ref="CONSOLE"/>
+  </logger>
+
+  <!-- Hibernate: log slow/important SQL but not every query -->
+  <logger name="org.hibernate.SQL" level="WARN"/>
+  <logger name="org.hibernate.orm.jdbc.bind" level="WARN"/>
+
+  <!-- Spring framework -->
+  <logger name="org.springframework" level="INFO"/>
+  <logger name="org.springframework.security" level="WARN"/>
+  <logger name="org.springframework.amqp" level="INFO"/>
+
+  <!-- AWS SDK -->
+  <logger name="software.amazon.awssdk" level="WARN"/>
+
+  <root level="WARN">
+    <appender-ref ref="CONSOLE"/>
+  </root>
+
+</configuration>

@@ -4,13 +4,20 @@ import type {
   ThumbnailsGenerationJobCreationRequest,
   ThumbnailsGenerationJobDTO,
   JobLimitsDTO,
+  PageResponse,
 } from '../types/api.types';
 
 export function listJobs(
   user: User,
   accountId: string,
-): Promise<ThumbnailsGenerationJobDTO[]> {
-  return apiRequest<ThumbnailsGenerationJobDTO[]>('/thumbnails-generation-job', user, { accountId });
+  page: number,
+  size: number,
+): Promise<PageResponse<ThumbnailsGenerationJobDTO>> {
+  return apiRequest<PageResponse<ThumbnailsGenerationJobDTO>>(
+    `/thumbnails-generation-job?page=${page}&size=${size}`,
+    user,
+    { accountId },
+  );
 }
 
 export function createJob(

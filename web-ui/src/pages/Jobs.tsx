@@ -18,7 +18,9 @@ import {
   TableBody,
   TableCell,
   TableContainer,
+  TableFooter,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Tooltip,
@@ -52,6 +54,9 @@ export function Jobs() {
   const [jobs, setJobs] = useState<ThumbnailsGenerationJobDTO[]>([]);
   const [specs, setSpecs] = useState<JobSpecDTO[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalElements, setTotalElements] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -68,11 +73,12 @@ export function Jobs() {
 
   useEffect(() => {
     if (!user || !accountId) return;
-    Promise.all([listJobs(user, accountId), listJobSpecs(user, accountId)])
-      .then(([j, s]) => { setJobs(j); setSpecs(s); })
+    setLoading(true);
+    Promise.all([listJobs(user, accountId, page, pageSize), listJobSpecs(user, accountId)])
+      .then(([j, s]) => { setJobs(j.content); setTotalElements(j.totalElements); setSpecs(s); })
       .catch(() => setError('Failed to load data'))
       .finally(() => setLoading(false));
-  }, [user, accountId]);
+  }, [user, accountId, page, pageSize]);
 
   const openDialog = () => {
     setVideoURL('');
@@ -89,8 +95,11 @@ export function Jobs() {
     setError('');
     try {
       const parsedStreamIndex = streamIndex.trim() !== '' ? parseInt(streamIndex, 10) : null;
-      const created = await createJob(user, accountId, { videoURL, jobSpecId, streamIndex: parsedStreamIndex, preview });
-      setJobs((prev) => [created, ...prev]);
+      await createJob(user, accountId, { videoURL, jobSpecId, streamIndex: parsedStreamIndex, preview });
+      setPage(0);
+      const refreshed = await listJobs(user, accountId, 0, pageSize);
+      setJobs(refreshed.content);
+      setTotalElements(refreshed.totalElements);
       setDialogOpen(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create job');
@@ -176,9 +185,11 @@ export function Jobs() {
                     <Tooltip title={
                       job.downloadUrl
                         ? 'Download sprites as ZIP'
-                        : ['SUCCESS', 'FAILURE'].includes(job.status)
+                        : job.status === 'SUCCESS'
                           ? 'Download link expired (available for 2 hours after completion)'
-                          : 'Job not finished yet'
+                          : job.status === 'FAILURE'
+                            ? 'Job failed'
+                            : 'Job not finished yet'
                     }>
                       <span>
                         <Button
@@ -199,6 +210,18 @@ export function Jobs() {
                 </TableRow>
               ))}
             </TableBody>
+            <TableFooter>
+              <TableRow>
+                <TablePagination
+                  count={totalElements}
+                  page={page}
+                  rowsPerPage={pageSize}
+                  rowsPerPageOptions={[10, 20, 50]}
+                  onPageChange={(_, newPage) => setPage(newPage)}
+                  onRowsPerPageChange={(e) => { setPageSize(parseInt(e.target.value, 10)); setPage(0); }}
+                />
+              </TableRow>
+            </TableFooter>
           </Table>
         </TableContainer>
       )}

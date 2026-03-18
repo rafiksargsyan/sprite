@@ -1,6 +1,8 @@
 package com.rsargsyan.sprite.main_ctx.core.domain.aggregate;
 
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.EmbeddedJobSpec;
+import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.FailureReason;
+import com.rsargsyan.sprite.main_ctx.core.exception.IllegalJobStateTransitionException;
 import com.rsargsyan.sprite.main_ctx.core.exception.InvalidThumbnailConfigException;
 import com.rsargsyan.sprite.main_ctx.core.exception.MalformedUrlException;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
@@ -32,11 +34,14 @@ public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
 
   private boolean preview;
 
-  private String failureReason;
+  @Enumerated(EnumType.STRING)
+  private FailureReason failureReason;
 
   private Instant startedAt;
 
   private Instant finishedAt;
+
+  private Instant lastHeartbeatAt;
 
   @SuppressWarnings("unused")
   ThumbnailsGenerationJob() {}
@@ -58,31 +63,43 @@ public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
 
   public void queue() {
     if (this.status != Status.SUBMITTED) {
-      throw new RuntimeException("Must be in submitted state"); //TODO: Create custom exception
+      throw new IllegalJobStateTransitionException(this.status, Status.QUEUED);
     }
     this.status = Status.QUEUED;
     touch();
   }
 
-  public void run() {
+  public void receive() {
     if (this.status != Status.QUEUED) {
-      throw new RuntimeException("Must be in queued state");
+      throw new IllegalJobStateTransitionException(this.status, Status.RECEIVED);
+    }
+    this.status = Status.RECEIVED;
+    touch();
+  }
+
+  public void run() {
+    if (this.status != Status.RECEIVED) {
+      throw new IllegalJobStateTransitionException(this.status, Status.IN_PROGRESS);
     }
     this.status = Status.IN_PROGRESS;
     this.startedAt = Instant.now();
     touch();
   }
 
+  public void heartbeat() {
+    this.lastHeartbeatAt = Instant.now();
+  }
+
   public void succeed() {
     if (this.status != Status.IN_PROGRESS) {
-      throw new RuntimeException("Must be in in_progress state");
+      throw new IllegalJobStateTransitionException(this.status, Status.SUCCESS);
     }
     this.status = Status.SUCCESS;
     this.finishedAt = Instant.now();
     touch();
   }
 
-  public void fail(String reason) {
+  public void fail(FailureReason reason) {
     this.status = Status.FAILURE;
     this.failureReason = reason;
     this.finishedAt = Instant.now();
@@ -92,6 +109,7 @@ public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
   public enum Status {
     SUBMITTED,
     QUEUED,
+    RECEIVED,
     IN_PROGRESS,
     SUCCESS,
     FAILURE

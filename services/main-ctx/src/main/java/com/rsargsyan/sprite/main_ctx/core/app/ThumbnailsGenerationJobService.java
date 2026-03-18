@@ -5,22 +5,45 @@ import com.rsargsyan.sprite.main_ctx.core.Util;
 import com.rsargsyan.sprite.main_ctx.core.app.dto.ThumbnailsGenerationJobCreationDTO;
 import com.rsargsyan.sprite.main_ctx.core.app.dto.ThumbnailsGenerationJobDTO;
 import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.ThumbnailsGenerationJob;
-import com.rsargsyan.sprite.main_ctx.core.exception.ResourceNotFoundException;
+import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.FailureReason;
+import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.ThumbnailConfig;
+import com.rsargsyan.sprite.main_ctx.core.exception.*;
 import com.rsargsyan.sprite.main_ctx.core.ports.repository.AccountRepository;
 import com.rsargsyan.sprite.main_ctx.core.ports.repository.JobSpecRepository;
 import com.rsargsyan.sprite.main_ctx.core.ports.repository.ThumbnailsGenerationJobRepository;
 import jakarta.transaction.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
+@Slf4j
 @Service
 public class ThumbnailsGenerationJobService {
 
@@ -32,6 +55,8 @@ public class ThumbnailsGenerationJobService {
   private final JobSpecRepository jobSpecRepository;
   private final S3Presigner s3Presigner;
   private final Config config;
+  private final TransactionTemplate transactionTemplate;
+  private final ScheduledExecutorService heartbeatScheduler = Executors.newSingleThreadScheduledExecutor();
 
   @Autowired
   public ThumbnailsGenerationJobService(
@@ -40,7 +65,8 @@ public class ThumbnailsGenerationJobService {
       AccountRepository accountRepository,
       JobSpecRepository jobSpecRepository,
       S3Presigner s3Presigner,
-      Config config
+      Config config,
+      TransactionTemplate transactionTemplate
   ) {
     this.thumbnailsGenerationJobRepository = thumbnailsGenerationJobRepository;
     this.applicationEventPublisher = applicationEventPublisher;
@@ -48,11 +74,13 @@ public class ThumbnailsGenerationJobService {
     this.jobSpecRepository = jobSpecRepository;
     this.s3Presigner = s3Presigner;
     this.config = config;
+    this.transactionTemplate = transactionTemplate;
   }
 
-  public List<ThumbnailsGenerationJobDTO> findAll(String accountId) {
-    return thumbnailsGenerationJobRepository.findByAccountId(Util.validateTSID(accountId))
-        .stream().map(job -> ThumbnailsGenerationJobDTO.from(job, presignedDownloadUrl(job))).toList();
+  public Page<ThumbnailsGenerationJobDTO> findAll(String accountId, int page, int size) {
+    var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+    return thumbnailsGenerationJobRepository.findByAccountId(Util.validateTSID(accountId), pageable)
+        .map(job -> ThumbnailsGenerationJobDTO.from(job, presignedDownloadUrl(job)));
   }
 
   public ThumbnailsGenerationJobDTO findById(String accountId, String jobId) {
@@ -75,30 +103,229 @@ public class ThumbnailsGenerationJobService {
         .orElseThrow(ResourceNotFoundException::new);
     var job = new ThumbnailsGenerationJob(account, dto.getVideoURL(), jobSpec.toEmbedded(), dto.getStreamIndex(), dto.isPreview());
     thumbnailsGenerationJobRepository.save(job);
-    applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobUpsertEvent(job.getId()));
+    applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobCreatedEvent(job.getId()));
     return ThumbnailsGenerationJobDTO.from(job, null);
   }
 
   @Transactional
-  public void run(String id) {
+  public void receive(String id) {
+    thumbnailsGenerationJobRepository.findById(Util.validateTSID(id)).ifPresentOrElse(
+        job -> {
+          job.receive();
+          thumbnailsGenerationJobRepository.save(job);
+          applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobReceivedEvent(job.getId()));
+        },
+        () -> { throw new ResourceNotFoundException(); }
+    );
+  }
+
+  void process(Long jobId) {
+    var job = transactionTemplate.execute(status -> {
+      var j = thumbnailsGenerationJobRepository.findById(jobId)
+          .orElseThrow(ResourceNotFoundException::new);
+      j.run();
+      thumbnailsGenerationJobRepository.save(j);
+      return j;
+    });
+    if (job == null) return;
+
+    String strId = job.getStrId();
+    Path jobFolder = Paths.get(config.baseOutputFolder).resolve(strId);
+    Path zipFile = Paths.get(config.baseOutputFolder).resolve(strId + ".zip");
+
+    ScheduledFuture<?> heartbeat = heartbeatScheduler.scheduleAtFixedRate(
+        () -> thumbnailsGenerationJobRepository.updateHeartbeat(jobId, Instant.now()),
+        config.heartbeatIntervalSeconds,
+        config.heartbeatIntervalSeconds,
+        TimeUnit.SECONDS
+    );
+
     try {
-      thumbnailsGenerationJobRepository.findById(Util.validateTSID(id)).ifPresentOrElse(
-          job -> {
-            job.run();
-            thumbnailsGenerationJobRepository.save(job);
-            applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobUpsertEvent(job.getId()));
-          },
-          () -> {
-            throw new RuntimeException();
-          }
-      );
+      List<ThumbnailConfig> configs = job.getJobSpec().configs();
+      String videoUrl = job.getVideoURL().toString();
+
+      checkVideoAccessibility(videoUrl);
+
+      String videoPath;
+      if (configs.size() > 1 && hasSufficientDiskSpace()) {
+        Files.createDirectories(jobFolder);
+        long t = System.nanoTime();
+        videoPath = downloadVideo(videoUrl, jobFolder).toString();
+        log.info("[{}] Download: {}s", strId, elapsed(t));
+      } else {
+        videoPath = videoUrl;
+      }
+
+      for (ThumbnailConfig cfg : configs) {
+        Path configFolder = jobFolder.resolve(cfg.folderName());
+        long t = System.nanoTime();
+        try {
+          VideoThumbnailGenerator.run(videoPath, configFolder, cfg, job.getStreamIndex(), config.ffmpegThreads);
+        } catch (InvalidThumbnailConfigException e) {
+          throw e;
+        } catch (Exception e) {
+          throw new JobFailureException(FailureReason.PROCESSING_FAILED, e);
+        }
+        log.info("[{}] Transcoding ({}): {}s", strId, cfg.folderName(), elapsed(t));
+      }
+
+      long t = System.nanoTime();
+      zipDirectory(jobFolder, zipFile);
+      log.info("[{}] Zip: {}s", strId, elapsed(t));
+
+      if (job.isPreview()) {
+        try {
+          long pt = System.nanoTime();
+          awsS3Upload(jobFolder, strId + "/", true);
+          log.info("[{}] Preview upload: {}s", strId, elapsed(pt));
+        } catch (Exception ignored) {
+          // Directory upload is best-effort; zip upload is the source of truth
+        }
+      }
+
+      long ut = System.nanoTime();
+      try {
+        awsS3Upload(zipFile, strId + ".zip", false);
+      } catch (Exception e) {
+        throw new JobFailureException(FailureReason.UPLOAD_FAILED, e);
+      }
+      log.info("[{}] ZIP upload: {}s", strId, elapsed(ut));
+
+      transactionTemplate.executeWithoutResult(status -> {
+        var j = thumbnailsGenerationJobRepository.findById(jobId).orElseThrow(ResourceNotFoundException::new);
+        j.succeed();
+        thumbnailsGenerationJobRepository.save(j);
+      });
+
     } catch (Exception e) {
-      //
+      log.error("[{}] Processing failed: {}", strId, e.getMessage(), e);
+      FailureReason reason = toFailureReason(e);
+      try {
+        transactionTemplate.executeWithoutResult(status -> {
+          var j = thumbnailsGenerationJobRepository.findById(jobId).orElseThrow(ResourceNotFoundException::new);
+          j.fail(reason);
+          thumbnailsGenerationJobRepository.save(j);
+        });
+      } catch (Exception saveException) {
+        log.error("[{}] Failed to persist failure status", strId, saveException);
+      }
+    } finally {
+      heartbeat.cancel(false);
+      deleteRecursively(jobFolder);
+      try { Files.deleteIfExists(zipFile); } catch (IOException ignored) {}
     }
   }
 
+  private void checkVideoAccessibility(String videoUrl) {
+    try {
+      var client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
+      var request = HttpRequest.newBuilder()
+          .method("HEAD", HttpRequest.BodyPublishers.noBody())
+          .uri(URI.create(videoUrl))
+          .build();
+      var response = client.send(request, HttpResponse.BodyHandlers.discarding());
+      int status = response.statusCode();
+      if (status >= 400 && status != 405) {
+        throw new VideoNotAccessibleException("Video returned HTTP " + status + ": " + videoUrl);
+      }
+      response.headers().firstValueAsLong("content-length").ifPresent(size -> {
+        if (size > config.maxVideoFileSizeBytes) {
+          throw new VideoFileTooLargeException(size, config.maxVideoFileSizeBytes);
+        }
+      });
+    } catch (VideoNotAccessibleException | VideoFileTooLargeException e) {
+      throw e;
+    } catch (Exception ignored) {
+      // Can't reach server — proceed and let ffprobe surface the real error
+    }
+  }
+
+  private boolean hasSufficientDiskSpace() {
+    try {
+      long freeSpace = Files.getFileStore(Paths.get(config.baseOutputFolder)).getUsableSpace();
+      return freeSpace >= config.minFreeDiskSpaceBytes;
+    } catch (IOException e) {
+      return false;
+    }
+  }
+
+  private static Path downloadVideo(String videoUrl, Path jobFolder) {
+    Path videoFile = jobFolder.resolve("video");
+    var client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
+    var request = HttpRequest.newBuilder().uri(URI.create(videoUrl)).build();
+    try {
+      var response = client.send(request, HttpResponse.BodyHandlers.ofFile(videoFile));
+      if (response.statusCode() >= 400) {
+        throw new VideoNotAccessibleException("Video returned HTTP " + response.statusCode() + ": " + videoUrl);
+      }
+    } catch (VideoNotAccessibleException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new VideoNotAccessibleException("Failed to download video: " + videoUrl, e);
+    }
+    return videoFile;
+  }
+
+  private void awsS3Upload(Path source, String s3Key, boolean recursive) throws Exception {
+    ProcessBuilder pb = new ProcessBuilder(
+        "aws", "s3", "cp",
+        source.toString(),
+        "s3://" + config.s3Bucket + "/" + s3Key,
+        "--endpoint-url", config.s3Endpoint
+    );
+    if (recursive) {
+      pb.command().add("--recursive");
+    }
+    pb.environment().put("AWS_ACCESS_KEY_ID", config.s3AccessKeyId);
+    pb.environment().put("AWS_SECRET_ACCESS_KEY", config.s3SecretAccessKey);
+    pb.environment().put("AWS_DEFAULT_REGION", config.s3Region);
+    pb.inheritIO();
+    int exitCode = pb.start().waitFor();
+    if (exitCode != 0) {
+      throw new RuntimeException("aws s3 cp failed with exit code " + exitCode);
+    }
+  }
+
+  private static void zipDirectory(Path source, Path target) throws IOException {
+    try (ZipOutputStream zos = new ZipOutputStream(Files.newOutputStream(target))) {
+      Files.walkFileTree(source, new SimpleFileVisitor<>() {
+        @Override
+        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+          zos.putNextEntry(new ZipEntry(source.relativize(file).toString()));
+          Files.copy(file, zos);
+          zos.closeEntry();
+          return FileVisitResult.CONTINUE;
+        }
+      });
+    }
+  }
+
+  private static void deleteRecursively(Path path) {
+    if (!Files.exists(path)) return;
+    try (var stream = Files.walk(path)) {
+      stream.sorted(Comparator.reverseOrder())
+          .forEach(p -> {
+            try { Files.delete(p); } catch (IOException ignored) {}
+          });
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  private static long elapsed(long startNano) {
+    return TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - startNano);
+  }
+
+  private static FailureReason toFailureReason(Exception e) {
+    if (e instanceof JobFailureException jfe) return jfe.reason;
+    if (e instanceof VideoFileTooLargeException) return FailureReason.VIDEO_TOO_LARGE;
+    if (e instanceof VideoNotAccessibleException) return FailureReason.VIDEO_NOT_ACCESSIBLE;
+    if (e instanceof InvalidThumbnailConfigException) return FailureReason.INVALID_STREAM_INDEX;
+    return FailureReason.UNKNOWN;
+  }
+
   private String presignedDownloadUrl(ThumbnailsGenerationJob job) {
-    if (job.getFinishedAt() == null) return null;
+    if (job.getStatus() != ThumbnailsGenerationJob.Status.SUCCESS) return null;
     Instant expiry = job.getFinishedAt().plus(DOWNLOAD_WINDOW);
     Instant now = Instant.now();
     if (!now.isBefore(expiry)) return null;

@@ -101,6 +101,12 @@ export interface JobSpecCreationRequest {
   configs: ThumbnailConfigRequest[];
 }
 
+export type JobFailureReason =
+  | 'VIDEO_TOO_LARGE'
+  | 'VIDEO_NOT_ACCESSIBLE'
+  | 'INVALID_STREAM_INDEX'
+  | 'SERVER_ERROR';
+
 export interface ThumbnailsGenerationJobDTO {
   id: string;
   videoUrl: string;
@@ -112,6 +118,7 @@ export interface ThumbnailsGenerationJobDTO {
   startedAt: string | null;
   finishedAt: string | null;
   downloadUrl: string | null;
+  failureReason: JobFailureReason | null;
 }
 
 export interface ThumbnailsGenerationJobCreationRequest {
@@ -123,4 +130,12 @@ export interface ThumbnailsGenerationJobCreationRequest {
 
 export interface JobLimitsDTO {
   maxFileSizeBytes: number;
+}
+
+export interface PageResponse<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
 }

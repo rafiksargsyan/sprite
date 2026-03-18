@@ -3,6 +3,7 @@ package com.rsargsyan.sprite.main_ctx.core.app.dto;
 import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.ThumbnailsGenerationJob;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.EmbeddedJobSpec;
 import lombok.Value;
+import org.springframework.lang.Nullable;
 
 import java.net.URL;
 import java.time.Instant;
@@ -19,15 +20,23 @@ public class ThumbnailsGenerationJobDTO {
   Instant startedAt;
   Instant finishedAt;
   String downloadUrl;
+  @Nullable JobFailureReason failureReason;
 
   public static ThumbnailsGenerationJobDTO from(ThumbnailsGenerationJob job, String downloadUrl) {
+    JobFailureReason failureReason = job.getFailureReason() != null
+        ? JobFailureReason.from(job.getFailureReason())
+        : null;
     return new ThumbnailsGenerationJobDTO(
         job.getStrId(), job.getVideoURL(), externalStatus(job.getStatus()), job.getJobSpec(),
-        job.getStreamIndex(), job.isPreview(), job.getCreatedAt(), job.getStartedAt(), job.getFinishedAt(), downloadUrl
+        job.getStreamIndex(), job.isPreview(), job.getCreatedAt(), job.getStartedAt(), job.getFinishedAt(),
+        downloadUrl, failureReason
     );
   }
 
   private static String externalStatus(ThumbnailsGenerationJob.Status status) {
-    return status == ThumbnailsGenerationJob.Status.QUEUED ? "SUBMITTED" : status.name();
+    return switch (status) {
+      case QUEUED, RECEIVED -> "SUBMITTED";
+      default -> status.name();
+    };
   }
 }

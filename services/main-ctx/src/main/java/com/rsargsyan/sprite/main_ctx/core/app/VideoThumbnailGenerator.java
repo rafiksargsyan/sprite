@@ -9,37 +9,30 @@ import com.rsargsyan.sprite.main_ctx.core.exception.InvalidThumbnailConfigExcept
 
 import java.io.*;
 import java.nio.file.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.Stream;
 
 public class VideoThumbnailGenerator {
 
-  public static void run(String videoFilePath, Path configFolder, ThumbnailConfig config, Integer streamIndex) throws Exception {
+  public static void run(String videoFilePath, Path configFolder, ThumbnailConfig config, Integer streamIndex, int threads) throws Exception {
 
     Files.createDirectories(configFolder);
 
     double fps = resolveFps(videoFilePath, streamIndex);
 
-    generateThumbnails(videoFilePath, configFolder, config.resolution(), config.interval(), fps, streamIndex);
+    generateThumbnails(videoFilePath, configFolder, config.resolution(), config.interval(), fps, streamIndex, threads);
 
-    Dimension dim = resolveImageSize(configFolder.resolve("thumbnail-000001.png"));
+    Dimension dim = resolveImageSize(configFolder.resolve("thumbnail-000001.jpg"));
 
     int thumbnailsCount = countThumbnails(configFolder);
     int spriteR = config.spriteSize().rows();
     int spriteC = config.spriteSize().cols();
     int spriteS = spriteR * spriteC;
 
-    generateSprites(configFolder, spriteC, spriteR, config);
+    generateSprites(configFolder, spriteC, spriteR, spriteS, config);
 
     deleteThumbnails(configFolder);
-
-    String spriteExt = config.format();
-    if (thumbnailsCount <= spriteS) {
-      Files.move(
-          configFolder.resolve("sprite." + spriteExt),
-          configFolder.resolve("sprite-0." + spriteExt),
-          StandardCopyOption.REPLACE_EXISTING
-      );
-    }
 
     generateWebVtt(configFolder, thumbnailsCount, spriteS, spriteC, dim.width, dim.height,
         config.interval(), config.format());
@@ -49,7 +42,7 @@ public class VideoThumbnailGenerator {
 
     ProcessBuilder pb = new ProcessBuilder(
         "ffprobe",
-        "-v", "quiet",
+        "-v", "error",
         "-print_format", "json",
         "-show_streams",
         "-i", videoUrl
@@ -57,9 +50,10 @@ public class VideoThumbnailGenerator {
 
     Process process = pb.start();
     String json = new String(process.getInputStream().readAllBytes());
+    String stderr = new String(process.getErrorStream().readAllBytes());
     int exitCode = process.waitFor();
     if (exitCode != 0) {
-      throw new RuntimeException("ffprobe failed (exit " + exitCode + ") for: " + videoUrl);
+      throw new RuntimeException("ffprobe failed (exit " + exitCode + "): " + stderr.strip());
     }
 
     ObjectMapper mapper = new ObjectMapper();
@@ -104,23 +98,20 @@ public class VideoThumbnailGenerator {
                                          int resolution,
                                          int interval,
                                          double fps,
-                                         Integer streamIndex) throws Exception {
+                                         Integer streamIndex,
+                                         int threads) throws Exception {
 
     String mapFlag = streamIndex != null ? "-map 0:" + streamIndex + " " : "";
     String cmd = String.format(
-        "ffmpeg -i '%s' " + mapFlag + "-vf \"select='isnan(prev_selected_t)+gte(t-floor(prev_selected_t),%d)',scale=-2:%d,setpts=N/%f/TB\" thumbnail-%%06d.png",
+        "ffmpeg -threads %d -skip_frame noref -i '%s' " + mapFlag + "-vf \"select='isnan(prev_selected_t)+gte(t-floor(prev_selected_t),%d)',scale=-2:%d,setpts=N/%f/TB\" -vsync vfr -q:v 2 thumbnail-%%06d.jpg",
+        threads,
         videoUrl,
         interval,
         resolution,
         fps
     );
 
-    ProcessBuilder pb = new ProcessBuilder("bash", "-c", cmd);
-    pb.directory(outputDir.toFile());
-    pb.inheritIO();
-
-    Process process = pb.start();
-    process.waitFor();
+    runChecked(cmd, outputDir, "ffmpeg");
   }
 
   private static Dimension resolveImageSize(Path imagePath) throws Exception {
@@ -154,15 +145,51 @@ public class VideoThumbnailGenerator {
     }
   }
 
-  private static void generateSprites(Path dir, int spriteC, int spriteR, ThumbnailConfig config) throws Exception {
+  private static void generateSprites(Path dir, int spriteC, int spriteR, int spriteS, ThumbnailConfig config) throws Exception {
 
-    // Step 1: build montage as PNG (avoids animated WebP when writing multi-sprite output)
-    String montageCmd = String.format(
-        "magick montage -geometry +0+0 -tile %dx%d thumbnail-*.png sprite.png",
-        spriteC, spriteR);
-    new ProcessBuilder("bash", "-c", montageCmd).directory(dir.toFile()).start().waitFor();
+    List<Path> thumbnails;
+    try (Stream<Path> stream = Files.list(dir)) {
+      thumbnails = stream
+          .filter(p -> p.getFileName().toString().startsWith("thumbnail-"))
+          .sorted()
+          .toList();
+    }
 
-    // Step 2: convert each sprite PNG to the target format individually
+    int spriteCount = (thumbnails.size() + spriteS - 1) / spriteS;
+
+    // Step 1: tile thumbnails into sprite-N.jpg using +append (rows) then -append (columns)
+    for (int s = 0; s < spriteCount; s++) {
+      List<Path> batch = thumbnails.subList(s * spriteS, Math.min((s + 1) * spriteS, thumbnails.size()));
+      List<Path> rowFiles = new ArrayList<>();
+
+      for (int r = 0; r < spriteR; r++) {
+        int from = r * spriteC;
+        if (from >= batch.size()) break;
+        List<Path> rowThumbs = batch.subList(from, Math.min(from + spriteC, batch.size()));
+
+        Path rowFile = dir.resolve("row-" + s + "-" + r + ".jpg");
+        List<String> cmd = new ArrayList<>(List.of("magick"));
+        rowThumbs.forEach(p -> cmd.add(p.toString()));
+        cmd.add("+append");
+        cmd.add(rowFile.toString());
+        runChecked(cmd, dir, "magick +append");
+        rowFiles.add(rowFile);
+      }
+
+      Path spriteFile = dir.resolve("sprite-" + s + ".jpg");
+      if (rowFiles.size() == 1) {
+        Files.move(rowFiles.get(0), spriteFile, StandardCopyOption.REPLACE_EXISTING);
+      } else {
+        List<String> cmd = new ArrayList<>(List.of("magick"));
+        rowFiles.forEach(p -> cmd.add(p.toString()));
+        cmd.add("-append");
+        cmd.add(spriteFile.toString());
+        runChecked(cmd, dir, "magick -append");
+        for (Path row : rowFiles) Files.deleteIfExists(row);
+      }
+    }
+
+    // Step 2: convert each sprite-N.jpg to the target format
     StringBuilder convertFlags = new StringBuilder();
     convertFlags.append(String.format("-quality %d ", config.quality()));
     if (config instanceof WebpThumbnailConfig webp) {
@@ -173,10 +200,18 @@ public class VideoThumbnailGenerator {
       convertFlags.append(String.format("-define avif:speed=%d ", avif.speed()));
     }
 
-    String convertCmd = String.format(
-        "for f in sprite*.png; do magick \"$f\" %s\"${f%%.png}.%s\" && rm \"$f\"; done",
-        convertFlags, config.format());
-    new ProcessBuilder("bash", "-c", convertCmd).directory(dir.toFile()).start().waitFor();
+    if (!config.format().equals("jpg")) {
+      String convertCmd = String.format(
+          "for f in sprite-*.jpg; do magick \"$f\" %s\"${f%%.jpg}.%s\" && rm \"$f\"; done",
+          convertFlags, config.format());
+      runChecked(convertCmd, dir, "magick convert");
+    } else if (convertFlags.toString().isBlank()) {
+      // jpg with default quality — already done, no conversion needed
+    } else {
+      String convertCmd = String.format(
+          "for f in sprite-*.jpg; do magick \"$f\" %s\"$f\"; done", convertFlags);
+      runChecked(convertCmd, dir, "magick convert");
+    }
   }
 
   private static void deleteThumbnails(Path dir) throws IOException {
@@ -241,6 +276,28 @@ public class VideoThumbnailGenerator {
     int milli = ms % 1000;
 
     return String.format("%02d:%02d:%02d.%03d", h, m, s, milli);
+  }
+
+  private static void runChecked(List<String> cmd, Path dir, String name) throws Exception {
+    ProcessBuilder pb = new ProcessBuilder(cmd).directory(dir.toFile());
+    pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+    Process process = pb.start();
+    String stderr = new String(process.getErrorStream().readAllBytes());
+    int exitCode = process.waitFor();
+    if (exitCode != 0) {
+      throw new RuntimeException(name + " failed (exit " + exitCode + "): " + stderr.strip());
+    }
+  }
+
+  private static void runChecked(String cmd, Path dir, String name) throws Exception {
+    ProcessBuilder pb = new ProcessBuilder("bash", "-c", cmd).directory(dir.toFile());
+    pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+    Process process = pb.start();
+    String stderr = new String(process.getErrorStream().readAllBytes());
+    int exitCode = process.waitFor();
+    if (exitCode != 0) {
+      throw new RuntimeException(name + " failed (exit " + exitCode + "): " + stderr.strip());
+    }
   }
 
   static class Dimension {
