@@ -3,10 +3,14 @@ package com.rsargsyan.sprite.main_ctx.core.app;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.AvifThumbnailConfig;
+import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.BlurhashThumbnailConfig;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.ThumbnailConfig;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.WebpThumbnailConfig;
 import com.rsargsyan.sprite.main_ctx.core.exception.InvalidThumbnailConfigException;
+import io.trbl.blurhash.BlurHash;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.*;
 import java.util.ArrayList;
@@ -23,19 +27,20 @@ public class VideoThumbnailGenerator {
 
     generateThumbnails(videoFilePath, configFolder, config.resolution(), config.interval(), fps, streamIndex, threads);
 
-    Dimension dim = resolveImageSize(configFolder.resolve("thumbnail-000001.jpg"));
-
-    int thumbnailsCount = countThumbnails(configFolder);
-    int spriteR = config.spriteSize().rows();
-    int spriteC = config.spriteSize().cols();
-    int spriteS = spriteR * spriteC;
-
-    generateSprites(configFolder, spriteC, spriteR, spriteS, config);
+    if (config instanceof BlurhashThumbnailConfig blurhash) {
+      generateBlurhashVtt(configFolder, blurhash.interval(), blurhash.componentsX(), blurhash.componentsY());
+    } else {
+      Dimension dim = resolveImageSize(configFolder.resolve("thumbnail-000001.jpg"));
+      int thumbnailsCount = countThumbnails(configFolder);
+      int spriteR = config.spriteSize().rows();
+      int spriteC = config.spriteSize().cols();
+      int spriteS = spriteR * spriteC;
+      generateSprites(configFolder, spriteC, spriteR, spriteS, config);
+      generateWebVtt(configFolder, thumbnailsCount, spriteS, spriteC, dim.width, dim.height,
+          config.interval(), config.format());
+    }
 
     deleteThumbnails(configFolder);
-
-    generateWebVtt(configFolder, thumbnailsCount, spriteS, spriteC, dim.width, dim.height,
-        config.interval(), config.format());
   }
 
   private static double resolveFps(String videoUrl, Integer streamIndex) throws Exception {
@@ -140,7 +145,7 @@ public class VideoThumbnailGenerator {
 
     try (Stream<Path> stream = Files.list(dir)) {
       return (int) stream
-          .filter(p -> p.getFileName().toString().startsWith("thumbnail"))
+          .filter(p -> p.getFileName().toString().startsWith("thumbnail-"))
           .count();
     }
   }
@@ -214,10 +219,44 @@ public class VideoThumbnailGenerator {
     }
   }
 
+  private static void generateBlurhashVtt(Path dir, int interval, int componentsX, int componentsY) throws Exception {
+
+    List<Path> thumbnails;
+    try (Stream<Path> stream = Files.list(dir)) {
+      thumbnails = stream
+          .filter(p -> p.getFileName().toString().startsWith("thumbnail-"))
+          .sorted()
+          .toList();
+    }
+
+    Path vttFile = dir.resolve("thumbnails.vtt");
+    StringBuilder vtt = new StringBuilder("WEBVTT\n\n");
+
+    for (int i = 0; i < thumbnails.size(); i++) {
+      BufferedImage img = ImageIO.read(thumbnails.get(i).toFile());
+      int width = img.getWidth();
+      int height = img.getHeight();
+      int[] pixels = img.getRGB(0, 0, width, height, null, 0, width);
+      String hash = BlurHash.encode(pixels, width, height, componentsX, componentsY);
+
+      int start = i * interval;
+      int end = (i + 1) * interval;
+
+      vtt.append(vttTimestamp(start))
+          .append(" --> ")
+          .append(vttTimestamp(end))
+          .append("\n")
+          .append(hash).append(" ").append(width).append(" ").append(height)
+          .append("\n\n");
+    }
+
+    Files.writeString(vttFile, vtt.toString(), StandardOpenOption.CREATE_NEW);
+  }
+
   private static void deleteThumbnails(Path dir) throws IOException {
 
     try (Stream<Path> stream = Files.list(dir)) {
-      stream.filter(p -> p.getFileName().toString().startsWith("thumbnail"))
+      stream.filter(p -> p.getFileName().toString().startsWith("thumbnail-"))
           .forEach(p -> {
             try { Files.delete(p); } catch (Exception ignored) {}
           });

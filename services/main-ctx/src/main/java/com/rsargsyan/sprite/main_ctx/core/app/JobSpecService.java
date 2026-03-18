@@ -57,6 +57,8 @@ public class JobSpecService {
       return new WebpThumbnailConfig(r.resolution(), toSpriteSize(r.spriteSize()), r.quality(), r.method(), r.lossless(), r.interval(), r.preset(), r.folderName());
     } else if (req instanceof AvifThumbnailConfigRequest r) {
       return new AvifThumbnailConfig(r.resolution(), toSpriteSize(r.spriteSize()), r.quality(), r.interval(), r.speed(), r.folderName());
+    } else if (req instanceof BlurhashThumbnailConfigRequest r) {
+      return new BlurhashThumbnailConfig(r.resolution(), r.interval(), r.componentsX(), r.componentsY(), r.folderName());
     }
     throw new IllegalStateException("Unknown config type: " + req.getClass());
   }

@@ -2,6 +2,7 @@ package com.rsargsyan.sprite.main_ctx.core.app.dto;
 
 import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.JobSpec;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.AvifThumbnailConfig;
+import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.BlurhashThumbnailConfig;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.JpgThumbnailConfig;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.ThumbnailConfig;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.WebpThumbnailConfig;
@@ -38,6 +39,8 @@ public class JobSpecDTO {
       return new AvifThumbnailConfigResponse(
           c.resolution(), new SpriteSizeResponse(c.spriteSize().rows(), c.spriteSize().cols()), c.quality(), c.interval(), c.speed(), c.folderName()
       );
+    } else if (config instanceof BlurhashThumbnailConfig c) {
+      return new BlurhashThumbnailConfigResponse(c.resolution(), c.interval(), c.componentsX(), c.componentsY(), c.folderName());
     }
     throw new IllegalStateException("Unknown config type: " + config.getClass());
   }

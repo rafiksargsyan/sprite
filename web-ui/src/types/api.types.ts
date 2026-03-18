@@ -48,7 +48,16 @@ export interface AvifConfigResponse {
   folderName: string;
 }
 
-export type ThumbnailConfigResponse = JpgConfigResponse | WebpConfigResponse | AvifConfigResponse;
+export interface BlurhashConfigResponse {
+  format: 'blurhash';
+  resolution: number;
+  interval: number;
+  componentsX: number;
+  componentsY: number;
+  folderName: string;
+}
+
+export type ThumbnailConfigResponse = JpgConfigResponse | WebpConfigResponse | AvifConfigResponse | BlurhashConfigResponse;
 
 export interface JobSpecDTO {
   id: string;
@@ -93,7 +102,16 @@ export interface AvifConfigRequest {
   folderName: string;
 }
 
-export type ThumbnailConfigRequest = JpgConfigRequest | WebpConfigRequest | AvifConfigRequest;
+export interface BlurhashConfigRequest {
+  format: 'blurhash';
+  resolution: number;
+  interval: number;
+  componentsX: number;
+  componentsY: number;
+  folderName: string;
+}
+
+export type ThumbnailConfigRequest = JpgConfigRequest | WebpConfigRequest | AvifConfigRequest | BlurhashConfigRequest;
 
 export interface JobSpecCreationRequest {
   name: string;
@@ -136,8 +154,10 @@ export type PreviewFilesResponse = Record<string, string>;
 
 export interface PageResponse<T> {
   content: T[];
-  totalElements: number;
-  totalPages: number;
-  number: number;
-  size: number;
+  page: {
+    totalElements: number;
+    totalPages: number;
+    number: number;
+    size: number;
+  };
 }

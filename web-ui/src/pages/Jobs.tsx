@@ -1,3 +1,4 @@
+import { decode as decodeBlurhash } from 'blurhash';
 import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -41,7 +42,8 @@ import type { ThumbnailsGenerationJobDTO, JobSpecDTO, PreviewFilesResponse } fro
 const fmt = (ts: string | null) =>
   ts ? new Date(ts).toLocaleString() : '—';
 
-interface VttCue {
+type SpriteCue = {
+  type: 'sprite';
   start: number;
   end: number;
   file: string;
@@ -49,7 +51,18 @@ interface VttCue {
   y: number;
   w: number;
   h: number;
-}
+};
+
+type BlurhashCue = {
+  type: 'blurhash';
+  start: number;
+  end: number;
+  hash: string;
+  w: number;
+  h: number;
+};
+
+type VttCue = SpriteCue | BlurhashCue;
 
 function parseTimestamp(ts: string): number {
   const [h, m, s] = ts.split(':');
@@ -62,18 +75,15 @@ function parseVtt(text: string): VttCue[] {
   for (let i = 0; i < lines.length; i++) {
     const match = lines[i].trim().match(/^(\d{2}:\d{2}:\d{2}\.\d{3})\s+-->\s+(\d{2}:\d{2}:\d{2}\.\d{3})$/);
     if (match) {
-      const urlLine = lines[++i]?.trim() ?? '';
-      const urlMatch = urlLine.match(/^(.+?)#xywh=(\d+),(\d+),(\d+),(\d+)$/);
-      if (urlMatch) {
-        cues.push({
-          start: parseTimestamp(match[1]),
-          end: parseTimestamp(match[2]),
-          file: urlMatch[1],
-          x: parseInt(urlMatch[2]),
-          y: parseInt(urlMatch[3]),
-          w: parseInt(urlMatch[4]),
-          h: parseInt(urlMatch[5]),
-        });
+      const start = parseTimestamp(match[1]);
+      const end = parseTimestamp(match[2]);
+      const payload = lines[++i]?.trim() ?? '';
+      const spriteMatch = payload.match(/^(.+?)#xywh=(\d+),(\d+),(\d+),(\d+)$/);
+      const blurhashMatch = !spriteMatch ? payload.match(/^(\S+)\s+(\d+)\s+(\d+)$/) : null;
+      if (spriteMatch) {
+        cues.push({ type: 'sprite', start, end, file: spriteMatch[1], x: parseInt(spriteMatch[2]), y: parseInt(spriteMatch[3]), w: parseInt(spriteMatch[4]), h: parseInt(spriteMatch[5]) });
+      } else if (blurhashMatch) {
+        cues.push({ type: 'blurhash', start, end, hash: blurhashMatch[1], w: parseInt(blurhashMatch[2]), h: parseInt(blurhashMatch[3]) });
       }
     }
   }
@@ -120,11 +130,21 @@ function PreviewDialog({ job, user, accountId, onClose }: PreviewDialogProps) {
       .finally(() => setLoading(false));
   }, [selectedConfig]);
 
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const maxTime = cues.length > 0 ? cues[cues.length - 1].end : 0;
   const cue = findCue(cues, sliderValue);
-  const spriteUrl = cue && files ? files[cue.file] : null;
   const scale = cue ? displayWidth / cue.w : 1;
   const displayHeight = cue ? Math.round(cue.h * scale) : 0;
+  const spriteUrl = cue?.type === 'sprite' && files ? files[cue.file] : null;
+
+  useEffect(() => {
+    if (!canvasRef.current || cue?.type !== 'blurhash') return;
+    const pixels = decodeBlurhash(cue.hash, displayWidth, displayHeight);
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) return;
+    const imageData = new ImageData(pixels, displayWidth, displayHeight);
+    ctx.putImageData(imageData, 0, 0);
+  }, [cue, displayWidth, displayHeight]);
 
   return (
     <Dialog open onClose={onClose} maxWidth="md" fullWidth>
@@ -163,29 +183,40 @@ function PreviewDialog({ job, user, accountId, onClose }: PreviewDialogProps) {
 
           {loading && <Box display="flex" justifyContent="center"><CircularProgress /></Box>}
 
-          {!loading && cue && spriteUrl && (
+          {!loading && cue && (
             <Stack spacing={1} alignItems="center">
-              <Box
-                sx={{
-                  width: displayWidth,
-                  height: displayHeight,
-                  backgroundImage: `url(${spriteUrl})`,
-                  backgroundPosition: `-${Math.round(cue.x * scale)}px -${Math.round(cue.y * scale)}px`,
-                  backgroundSize: sheetSize
-                    ? `${Math.round(sheetSize.w * scale)}px ${Math.round(sheetSize.h * scale)}px`
-                    : 'auto',
-                  backgroundRepeat: 'no-repeat',
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  flexShrink: 0,
-                }}
-              />
-              <img
-                ref={imgRef}
-                src={spriteUrl}
-                style={{ display: 'none' }}
-                onLoad={(e) => setSheetSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
-              />
+              {cue.type === 'blurhash' ? (
+                <canvas
+                  ref={canvasRef}
+                  width={displayWidth}
+                  height={displayHeight}
+                  style={{ border: '1px solid', borderColor: 'divider', display: 'block' }}
+                />
+              ) : (
+                <>
+                  <Box
+                    sx={{
+                      width: displayWidth,
+                      height: displayHeight,
+                      backgroundImage: spriteUrl ? `url(${spriteUrl})` : 'none',
+                      backgroundPosition: `-${Math.round(cue.x * scale)}px -${Math.round(cue.y * scale)}px`,
+                      backgroundSize: sheetSize
+                        ? `${Math.round(sheetSize.w * scale)}px ${Math.round(sheetSize.h * scale)}px`
+                        : 'auto',
+                      backgroundRepeat: 'no-repeat',
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      flexShrink: 0,
+                    }}
+                  />
+                  <img
+                    ref={imgRef}
+                    src={spriteUrl ?? undefined}
+                    style={{ display: 'none' }}
+                    onLoad={(e) => setSheetSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+                  />
+                </>
+              )}
               <Box width="100%">
                 <MuiSlider
                   min={0}
@@ -213,7 +244,7 @@ function PreviewDialog({ job, user, accountId, onClose }: PreviewDialogProps) {
             </Stack>
           )}
 
-          {!loading && cues.length === 0 && files !== null && (
+          {!loading && cues.length === 0 && (
             <Typography color="text.secondary">No thumbnails found for this config.</Typography>
           )}
         </Stack>
@@ -262,7 +293,7 @@ export function Jobs() {
     if (!user || !accountId) return;
     setLoading(true);
     Promise.all([listJobs(user, accountId, page, pageSize), listJobSpecs(user, accountId)])
-      .then(([j, s]) => { setJobs(j.content); setTotalElements(j.totalElements); setSpecs(s); })
+      .then(([j, s]) => { setJobs(j.content); setTotalElements(j.page.totalElements); setSpecs(s); })
       .catch(() => setError('Failed to load data'))
       .finally(() => setLoading(false));
   }, [user, accountId, page, pageSize]);
@@ -286,7 +317,7 @@ export function Jobs() {
       setPage(0);
       const refreshed = await listJobs(user, accountId, 0, pageSize);
       setJobs(refreshed.content);
-      setTotalElements(refreshed.totalElements);
+      setTotalElements(refreshed.page.totalElements);
       setDialogOpen(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create job');

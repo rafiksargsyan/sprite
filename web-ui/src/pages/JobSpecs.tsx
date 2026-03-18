@@ -36,7 +36,7 @@ import type { JobSpecDTO, ThumbnailConfigRequest } from '../types/api.types';
 type WebpPreset = 'default' | 'picture' | 'photo' | 'drawing' | 'icon' | 'text';
 
 interface ConfigDraft {
-  format: 'jpg' | 'webp' | 'avif';
+  format: 'jpg' | 'webp' | 'avif' | 'blurhash';
   resolution: number;
   spriteRows: number;
   spriteCols: number;
@@ -46,6 +46,8 @@ interface ConfigDraft {
   lossless: boolean;
   preset: WebpPreset;
   speed: number;
+  componentsX: number;
+  componentsY: number;
   folderName: string;
 }
 
@@ -60,6 +62,8 @@ const defaultConfig = (): ConfigDraft => ({
   lossless: false,
   preset: 'default',
   speed: 6,
+  componentsX: 4,
+  componentsY: 3,
   folderName: '',
 });
 
@@ -70,6 +74,9 @@ function configDraftToRequest(c: ConfigDraft): ThumbnailConfigRequest {
   }
   if (c.format === 'avif') {
     return { format: 'avif', resolution: c.resolution, spriteSize, quality: c.quality, interval: c.interval, speed: c.speed, folderName: c.folderName };
+  }
+  if (c.format === 'blurhash') {
+    return { format: 'blurhash', resolution: c.resolution, interval: c.interval, componentsX: c.componentsX, componentsY: c.componentsY, folderName: c.folderName };
   }
   return { format: 'webp', resolution: c.resolution, spriteSize, quality: c.quality, interval: c.interval, method: c.method, lossless: c.lossless, preset: c.preset, folderName: c.folderName };
 }
@@ -207,24 +214,37 @@ export function JobSpecs() {
                     <Select
                       size="small"
                       value={cfg.format}
-                      onChange={(e) => updateConfig(i, { format: e.target.value as 'jpg' | 'webp' | 'avif', quality: e.target.value === 'jpg' ? 85 : 60 })}
-                      sx={{ minWidth: 90 }}
+                      onChange={(e) => updateConfig(i, { format: e.target.value as ConfigDraft['format'], quality: e.target.value === 'jpg' ? 85 : 60 })}
+                      sx={{ minWidth: 100 }}
                     >
                       <MenuItem value="jpg">JPG</MenuItem>
                       <MenuItem value="webp">WebP</MenuItem>
                       <MenuItem value="avif">AVIF</MenuItem>
+                      <MenuItem value="blurhash">Blurhash</MenuItem>
                     </Select>
                     <TextField size="small" label="Resolution (px height)" type="number" value={cfg.resolution}
                       onChange={(e) => updateConfig(i, { resolution: +e.target.value })} sx={{ width: 160 }} />
-                    <TextField size="small" label="Quality" type="number" value={cfg.quality}
-                      onChange={(e) => updateConfig(i, { quality: +e.target.value })} sx={{ width: 90 }} />
                     <TextField size="small" label="Interval (s)" type="number" value={cfg.interval}
                       onChange={(e) => updateConfig(i, { interval: +e.target.value })} sx={{ width: 110 }} />
-                    <TextField size="small" label="Sprite rows" type="number" value={cfg.spriteRows}
-                      onChange={(e) => updateConfig(i, { spriteRows: +e.target.value })} sx={{ width: 100 }} />
-                    <TextField size="small" label="Sprite cols" type="number" value={cfg.spriteCols}
-                      onChange={(e) => updateConfig(i, { spriteCols: +e.target.value })} sx={{ width: 100 }} />
+                    {cfg.format !== 'blurhash' && (
+                      <>
+                        <TextField size="small" label="Quality" type="number" value={cfg.quality}
+                          onChange={(e) => updateConfig(i, { quality: +e.target.value })} sx={{ width: 90 }} />
+                        <TextField size="small" label="Sprite rows" type="number" value={cfg.spriteRows}
+                          onChange={(e) => updateConfig(i, { spriteRows: +e.target.value })} sx={{ width: 100 }} />
+                        <TextField size="small" label="Sprite cols" type="number" value={cfg.spriteCols}
+                          onChange={(e) => updateConfig(i, { spriteCols: +e.target.value })} sx={{ width: 100 }} />
+                      </>
+                    )}
                   </Stack>
+                  {cfg.format === 'blurhash' && (
+                    <Stack direction="row" spacing={2} flexWrap="wrap" alignItems="center">
+                      <TextField size="small" label="Components X (1–9)" type="number" value={cfg.componentsX}
+                        onChange={(e) => updateConfig(i, { componentsX: +e.target.value })} sx={{ width: 150 }} />
+                      <TextField size="small" label="Components Y (1–9)" type="number" value={cfg.componentsY}
+                        onChange={(e) => updateConfig(i, { componentsY: +e.target.value })} sx={{ width: 150 }} />
+                    </Stack>
+                  )}
                   {cfg.format === 'avif' && (
                     <Stack direction="row" spacing={2} flexWrap="wrap" alignItems="center">
                       <TextField size="small" label="Speed (0–8)" type="number" value={cfg.speed}

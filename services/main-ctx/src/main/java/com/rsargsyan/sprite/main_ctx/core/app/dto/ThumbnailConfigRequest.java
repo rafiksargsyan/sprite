@@ -7,6 +7,8 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 @JsonSubTypes({
     @JsonSubTypes.Type(value = JpgThumbnailConfigRequest.class, name = "jpg"),
     @JsonSubTypes.Type(value = WebpThumbnailConfigRequest.class, name = "webp"),
-    @JsonSubTypes.Type(value = AvifThumbnailConfigRequest.class, name = "avif")
+    @JsonSubTypes.Type(value = AvifThumbnailConfigRequest.class, name = "avif"),
+    @JsonSubTypes.Type(value = BlurhashThumbnailConfigRequest.class, name = "blurhash")
 })
-public sealed interface ThumbnailConfigRequest permits JpgThumbnailConfigRequest, WebpThumbnailConfigRequest, AvifThumbnailConfigRequest {}
+public sealed interface ThumbnailConfigRequest permits JpgThumbnailConfigRequest, WebpThumbnailConfigRequest,
+    AvifThumbnailConfigRequest, BlurhashThumbnailConfigRequest {}
