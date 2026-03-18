@@ -42,6 +42,24 @@ public class ThumbnailsGenerationJobController {
         return ResponseEntity.ok(Map.of("maxFileSizeBytes", thumbnailsGenerationJobService.getMaxFileSizeBytes()));
     }
 
+    @GetMapping("/{id}/preview/{configFolderName}")
+    public ResponseEntity<Map<String, String>> getPreviewFiles(
+        @PathVariable String id,
+        @PathVariable String configFolderName
+    ) {
+        var userCtx = UserContextHolder.get();
+        return ResponseEntity.ok(thumbnailsGenerationJobService.getPreviewFiles(userCtx.getAccountId(), id, configFolderName));
+    }
+
+    @GetMapping(value = "/{id}/preview/{configFolderName}/vtt", produces = "text/vtt")
+    public ResponseEntity<String> getPreviewVtt(
+        @PathVariable String id,
+        @PathVariable String configFolderName
+    ) {
+        var userCtx = UserContextHolder.get();
+        return ResponseEntity.ok(thumbnailsGenerationJobService.getPreviewVtt(userCtx.getAccountId(), id, configFolderName));
+    }
+
     @PostMapping
     public ResponseEntity<ThumbnailsGenerationJobDTO> createThumbnailsGenerationJob(
         @RequestBody ThumbnailsGenerationJobCreationDTO req

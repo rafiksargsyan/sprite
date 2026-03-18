@@ -20,7 +20,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
+import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
@@ -35,7 +38,9 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -49,10 +54,13 @@ public class ThumbnailsGenerationJobService {
 
   private static final Duration DOWNLOAD_WINDOW = Duration.ofHours(2);
 
+  private static final Duration PREVIEW_URL_TTL = Duration.ofHours(1);
+
   private final ApplicationEventPublisher applicationEventPublisher;
   private final ThumbnailsGenerationJobRepository thumbnailsGenerationJobRepository;
   private final AccountRepository accountRepository;
   private final JobSpecRepository jobSpecRepository;
+  private final S3Client s3Client;
   private final S3Presigner s3Presigner;
   private final Config config;
   private final TransactionTemplate transactionTemplate;
@@ -64,6 +72,7 @@ public class ThumbnailsGenerationJobService {
       ApplicationEventPublisher applicationEventPublisher,
       AccountRepository accountRepository,
       JobSpecRepository jobSpecRepository,
+      S3Client s3Client,
       S3Presigner s3Presigner,
       Config config,
       TransactionTemplate transactionTemplate
@@ -72,6 +81,7 @@ public class ThumbnailsGenerationJobService {
     this.applicationEventPublisher = applicationEventPublisher;
     this.accountRepository = accountRepository;
     this.jobSpecRepository = jobSpecRepository;
+    this.s3Client = s3Client;
     this.s3Presigner = s3Presigner;
     this.config = config;
     this.transactionTemplate = transactionTemplate;
@@ -88,6 +98,58 @@ public class ThumbnailsGenerationJobService {
         .findByAccountIdAndId(Util.validateTSID(accountId), Util.validateTSID(jobId))
         .orElseThrow(ResourceNotFoundException::new);
     return ThumbnailsGenerationJobDTO.from(job, presignedDownloadUrl(job));
+  }
+
+  public Map<String, String> getPreviewFiles(String accountId, String jobId, String configFolderName) {
+    var job = thumbnailsGenerationJobRepository
+        .findByAccountIdAndId(Util.validateTSID(accountId), Util.validateTSID(jobId))
+        .orElseThrow(ResourceNotFoundException::new);
+
+    if (!job.isPreview() || job.getStatus() != ThumbnailsGenerationJob.Status.SUCCESS) {
+      throw new ResourceNotFoundException();
+    }
+
+    String prefix = job.getStrId() + "/" + configFolderName + "/";
+    var listed = s3Client.listObjectsV2(ListObjectsV2Request.builder()
+        .bucket(config.s3Bucket)
+        .prefix(prefix)
+        .build());
+
+    Map<String, String> result = new LinkedHashMap<>();
+    for (var obj : listed.contents()) {
+      String filename = obj.key().substring(prefix.length());
+      if (filename.isEmpty()) continue;
+      var presignRequest = GetObjectPresignRequest.builder()
+          .signatureDuration(PREVIEW_URL_TTL)
+          .getObjectRequest(GetObjectRequest.builder()
+              .bucket(config.s3Bucket)
+              .key(obj.key())
+              .build())
+          .build();
+      result.put(filename, s3Presigner.presignGetObject(presignRequest).url().toString());
+    }
+    return result;
+  }
+
+  public String getPreviewVtt(String accountId, String jobId, String configFolderName) {
+    var job = thumbnailsGenerationJobRepository
+        .findByAccountIdAndId(Util.validateTSID(accountId), Util.validateTSID(jobId))
+        .orElseThrow(ResourceNotFoundException::new);
+
+    if (!job.isPreview() || job.getStatus() != ThumbnailsGenerationJob.Status.SUCCESS) {
+      throw new ResourceNotFoundException();
+    }
+
+    String key = job.getStrId() + "/" + configFolderName + "/thumbnails.vtt";
+    try {
+      return s3Client.getObjectAsBytes(GetObjectRequest.builder()
+              .bucket(config.s3Bucket)
+              .key(key)
+              .build())
+          .asUtf8String();
+    } catch (NoSuchKeyException e) {
+      throw new ResourceNotFoundException();
+    }
   }
 
   public long getMaxFileSizeBytes() {

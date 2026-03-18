@@ -1,10 +1,11 @@
 import type { User } from 'firebase/auth';
-import { apiRequest } from './client';
+import { apiRequest, apiRequestText } from './client';
 import type {
   ThumbnailsGenerationJobCreationRequest,
   ThumbnailsGenerationJobDTO,
   JobLimitsDTO,
   PageResponse,
+  PreviewFilesResponse,
 } from '../types/api.types';
 
 export function listJobs(
@@ -30,6 +31,32 @@ export function createJob(
     accountId,
     body: JSON.stringify(body),
   });
+}
+
+export function getJobPreviewFiles(
+  user: User,
+  accountId: string,
+  jobId: string,
+  configFolderName: string,
+): Promise<PreviewFilesResponse> {
+  return apiRequest<PreviewFilesResponse>(
+    `/thumbnails-generation-job/${jobId}/preview/${configFolderName}`,
+    user,
+    { accountId },
+  );
+}
+
+export function getJobPreviewVtt(
+  user: User,
+  accountId: string,
+  jobId: string,
+  configFolderName: string,
+): Promise<string> {
+  return apiRequestText(
+    `/thumbnails-generation-job/${jobId}/preview/${configFolderName}/vtt`,
+    user,
+    { accountId },
+  );
 }
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';

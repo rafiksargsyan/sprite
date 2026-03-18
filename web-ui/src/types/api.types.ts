@@ -132,6 +132,8 @@ export interface JobLimitsDTO {
   maxFileSizeBytes: number;
 }
 
+export type PreviewFilesResponse = Record<string, string>;
+
 export interface PageResponse<T> {
   content: T[];
   totalElements: number;
