@@ -104,7 +104,6 @@ export interface AvifConfigRequest {
 
 export interface BlurhashConfigRequest {
   format: 'blurhash';
-  resolution: number;
   interval: number;
   componentsX: number;
   componentsY: number;
@@ -132,6 +131,7 @@ export interface ThumbnailsGenerationJobDTO {
   jobSpec: { configs: ThumbnailConfigResponse[] };
   streamIndex: number | null;
   preview: boolean;
+  previewAvailable: boolean;
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;

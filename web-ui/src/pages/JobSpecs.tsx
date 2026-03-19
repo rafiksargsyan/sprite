@@ -76,7 +76,7 @@ function configDraftToRequest(c: ConfigDraft): ThumbnailConfigRequest {
     return { format: 'avif', resolution: c.resolution, spriteSize, quality: c.quality, interval: c.interval, speed: c.speed, folderName: c.folderName };
   }
   if (c.format === 'blurhash') {
-    return { format: 'blurhash', resolution: c.resolution, interval: c.interval, componentsX: c.componentsX, componentsY: c.componentsY, folderName: c.folderName };
+    return { format: 'blurhash', interval: c.interval, componentsX: c.componentsX, componentsY: c.componentsY, folderName: c.folderName };
   }
   return { format: 'webp', resolution: c.resolution, spriteSize, quality: c.quality, interval: c.interval, method: c.method, lossless: c.lossless, preset: c.preset, folderName: c.folderName };
 }
@@ -167,7 +167,7 @@ export function JobSpecs() {
                   <TableCell>
                     <Stack direction="row" gap={0.5} flexWrap="wrap">
                       {s.configs.map((c, i) => (
-                        <Chip key={i} size="small" label={`${c.format} ${c.resolution}p`} />
+                        <Chip key={i} size="small" label={c.format === 'blurhash' ? `${c.format}` : `${c.format} ${c.resolution}p`} />
                       ))}
                     </Stack>
                   </TableCell>

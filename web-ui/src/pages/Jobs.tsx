@@ -380,7 +380,7 @@ export function Jobs() {
                   <TableCell>
                     <Stack direction="row" gap={0.5} flexWrap="wrap">
                       {job.jobSpec.configs.map((c, i) => (
-                        <Chip key={i} size="small" label={`${c.format} ${c.resolution}p`} />
+                        <Chip key={i} size="small" label={c.format === 'blurhash' ? `${c.format}` : `${c.format} ${c.resolution}p`} />
                       ))}
                     </Stack>
                   </TableCell>
@@ -428,14 +428,19 @@ export function Jobs() {
                   </TableCell>
                   <TableCell>
                     {job.preview && job.status === 'SUCCESS' && (
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        startIcon={<PlayCircleOutlineIcon />}
-                        onClick={() => setPreviewJob(job)}
-                      >
-                        Preview
-                      </Button>
+                      <Tooltip title={job.previewAvailable ? '' : 'Preview expired (available for 2 hours after completion)'}>
+                        <span>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<PlayCircleOutlineIcon />}
+                            onClick={() => setPreviewJob(job)}
+                            disabled={!job.previewAvailable}
+                          >
+                            Preview
+                          </Button>
+                        </span>
+                      </Tooltip>
                     )}
                   </TableCell>
                 </TableRow>

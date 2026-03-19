@@ -41,6 +41,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -65,6 +66,7 @@ public class ThumbnailsGenerationJobService {
   private final Config config;
   private final TransactionTemplate transactionTemplate;
   private final ScheduledExecutorService heartbeatScheduler = Executors.newSingleThreadScheduledExecutor();
+  private final ConcurrentHashMap<Long, ScheduledFuture<?>> activeHeartbeats = new ConcurrentHashMap<>();
 
   @Autowired
   public ThumbnailsGenerationJobService(
@@ -90,14 +92,14 @@ public class ThumbnailsGenerationJobService {
   public Page<ThumbnailsGenerationJobDTO> findAll(String accountId, int page, int size) {
     var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
     return thumbnailsGenerationJobRepository.findByAccountId(Util.validateTSID(accountId), pageable)
-        .map(job -> ThumbnailsGenerationJobDTO.from(job, presignedDownloadUrl(job)));
+        .map(job -> ThumbnailsGenerationJobDTO.from(job, presignedDownloadUrl(job), isPreviewAvailable(job)));
   }
 
   public ThumbnailsGenerationJobDTO findById(String accountId, String jobId) {
     var job = thumbnailsGenerationJobRepository
         .findByAccountIdAndId(Util.validateTSID(accountId), Util.validateTSID(jobId))
         .orElseThrow(ResourceNotFoundException::new);
-    return ThumbnailsGenerationJobDTO.from(job, presignedDownloadUrl(job));
+    return ThumbnailsGenerationJobDTO.from(job, presignedDownloadUrl(job), isPreviewAvailable(job));
   }
 
   public Map<String, String> getPreviewFiles(String accountId, String jobId, String configFolderName) {
@@ -166,13 +168,20 @@ public class ThumbnailsGenerationJobService {
     var job = new ThumbnailsGenerationJob(account, dto.getVideoURL(), jobSpec.toEmbedded(), dto.getStreamIndex(), dto.isPreview());
     thumbnailsGenerationJobRepository.save(job);
     applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobCreatedEvent(job.getId()));
-    return ThumbnailsGenerationJobDTO.from(job, null);
+    return ThumbnailsGenerationJobDTO.from(job, null, false);
   }
 
   @Transactional
   public void receive(String id) {
     thumbnailsGenerationJobRepository.findById(Util.validateTSID(id)).ifPresentOrElse(
         job -> {
+          ScheduledFuture<?> heartbeat = heartbeatScheduler.scheduleAtFixedRate(
+              () -> thumbnailsGenerationJobRepository.updateHeartbeat(job.getId(), Instant.now()),
+              0,
+              config.heartbeatIntervalSeconds,
+              TimeUnit.SECONDS
+          );
+          activeHeartbeats.put(job.getId(), heartbeat);
           job.receive();
           thumbnailsGenerationJobRepository.save(job);
           applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobReceivedEvent(job.getId()));
@@ -182,6 +191,8 @@ public class ThumbnailsGenerationJobService {
   }
 
   void process(Long jobId) {
+    ScheduledFuture<?> heartbeat = activeHeartbeats.get(jobId);
+
     var job = transactionTemplate.execute(status -> {
       var j = thumbnailsGenerationJobRepository.findById(jobId)
           .orElseThrow(ResourceNotFoundException::new);
@@ -194,13 +205,6 @@ public class ThumbnailsGenerationJobService {
     String strId = job.getStrId();
     Path jobFolder = Paths.get(config.baseOutputFolder).resolve(strId);
     Path zipFile = Paths.get(config.baseOutputFolder).resolve(strId + ".zip");
-
-    ScheduledFuture<?> heartbeat = heartbeatScheduler.scheduleAtFixedRate(
-        () -> thumbnailsGenerationJobRepository.updateHeartbeat(jobId, Instant.now()),
-        config.heartbeatIntervalSeconds,
-        config.heartbeatIntervalSeconds,
-        TimeUnit.SECONDS
-    );
 
     try {
       List<ThumbnailConfig> configs = job.getJobSpec().configs();
@@ -272,7 +276,8 @@ public class ThumbnailsGenerationJobService {
         log.error("[{}] Failed to persist failure status", strId, saveException);
       }
     } finally {
-      heartbeat.cancel(false);
+      activeHeartbeats.remove(jobId);
+      if (heartbeat != null) heartbeat.cancel(false);
       deleteRecursively(jobFolder);
       try { Files.deleteIfExists(zipFile); } catch (IOException ignored) {}
     }
@@ -384,6 +389,11 @@ public class ThumbnailsGenerationJobService {
     if (e instanceof VideoNotAccessibleException) return FailureReason.VIDEO_NOT_ACCESSIBLE;
     if (e instanceof InvalidThumbnailConfigException) return FailureReason.INVALID_STREAM_INDEX;
     return FailureReason.UNKNOWN;
+  }
+
+  private boolean isPreviewAvailable(ThumbnailsGenerationJob job) {
+    if (!job.isPreview() || job.getStatus() != ThumbnailsGenerationJob.Status.SUCCESS) return false;
+    return Instant.now().isBefore(job.getFinishedAt().plus(DOWNLOAD_WINDOW));
   }
 
   private String presignedDownloadUrl(ThumbnailsGenerationJob job) {

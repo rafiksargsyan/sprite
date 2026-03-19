@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -36,8 +37,7 @@ public class ApplicationEventListener {
     this.processingExecutor = Executors.newFixedThreadPool(config.processingPoolSize);
   }
 
-  @Async
-  @TransactionalEventListener
+  @EventListener
   public void handleThumbnailsGenerationJobCreatedEvent(ThumbnailsGenerationJobCreatedEvent event) {
     thumbnailsGenerationJobRepository.findById(event.jobId()).ifPresentOrElse(
         job -> {

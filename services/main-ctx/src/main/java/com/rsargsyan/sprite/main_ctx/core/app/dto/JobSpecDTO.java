@@ -40,7 +40,7 @@ public class JobSpecDTO {
           c.resolution(), new SpriteSizeResponse(c.spriteSize().rows(), c.spriteSize().cols()), c.quality(), c.interval(), c.speed(), c.folderName()
       );
     } else if (config instanceof BlurhashThumbnailConfig c) {
-      return new BlurhashThumbnailConfigResponse(c.resolution(), c.interval(), c.componentsX(), c.componentsY(), c.folderName());
+      return new BlurhashThumbnailConfigResponse(c.interval(), c.componentsX(), c.componentsY(), c.folderName());
     }
     throw new IllegalStateException("Unknown config type: " + config.getClass());
   }

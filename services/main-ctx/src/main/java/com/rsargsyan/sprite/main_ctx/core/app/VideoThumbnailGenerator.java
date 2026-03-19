@@ -25,7 +25,9 @@ public class VideoThumbnailGenerator {
 
     double fps = resolveFps(videoFilePath, streamIndex);
 
-    generateThumbnails(videoFilePath, configFolder, config.resolution(), config.interval(), fps, streamIndex, threads);
+    int resolution = config instanceof BlurhashThumbnailConfig ? 32 : config.resolution();
+    int jpegQuality = config instanceof BlurhashThumbnailConfig ? 8 : 2;
+    generateThumbnails(videoFilePath, configFolder, resolution, config.interval(), fps, streamIndex, threads, jpegQuality);
 
     if (config instanceof BlurhashThumbnailConfig blurhash) {
       generateBlurhashVtt(configFolder, blurhash.interval(), blurhash.componentsX(), blurhash.componentsY());
@@ -104,16 +106,18 @@ public class VideoThumbnailGenerator {
                                          int interval,
                                          double fps,
                                          Integer streamIndex,
-                                         int threads) throws Exception {
+                                         int threads,
+                                         int jpegQuality) throws Exception {
 
     String mapFlag = streamIndex != null ? "-map 0:" + streamIndex + " " : "";
     String cmd = String.format(
-        "ffmpeg -threads %d -skip_frame noref -i '%s' " + mapFlag + "-vf \"select='isnan(prev_selected_t)+gte(t-floor(prev_selected_t),%d)',scale=-2:%d,setpts=N/%f/TB\" -vsync vfr -q:v 2 thumbnail-%%06d.jpg",
+        "ffmpeg -threads %d -skip_frame noref -i '%s' " + mapFlag + "-vf \"select='isnan(prev_selected_t)+gte(t-floor(prev_selected_t),%d)',scale=-2:%d,setpts=N/%f/TB\" -vsync vfr -q:v %d thumbnail-%%06d.jpg",
         threads,
         videoUrl,
         interval,
         resolution,
-        fps
+        fps,
+        jpegQuality
     );
 
     runChecked(cmd, outputDir, "ffmpeg");
