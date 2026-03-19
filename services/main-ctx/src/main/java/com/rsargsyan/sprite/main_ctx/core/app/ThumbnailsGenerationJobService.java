@@ -5,6 +5,7 @@ import com.rsargsyan.sprite.main_ctx.core.Util;
 import com.rsargsyan.sprite.main_ctx.core.app.dto.ThumbnailsGenerationJobCreationDTO;
 import com.rsargsyan.sprite.main_ctx.core.app.dto.ThumbnailsGenerationJobDTO;
 import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.ThumbnailsGenerationJob;
+import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.ConfigProcessingStats;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.FailureReason;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.ThumbnailConfig;
 import com.rsargsyan.sprite.main_ctx.core.exception.*;
@@ -37,6 +38,7 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -159,6 +161,23 @@ public class ThumbnailsGenerationJobService {
   }
 
   @Transactional
+  public void retryStuckJobs() {
+    Instant threshold = Instant.now().minusSeconds(config.staleHeartbeatSeconds);
+    List<ThumbnailsGenerationJob> stuckJobs = thumbnailsGenerationJobRepository.findStuckJobs(threshold);
+    for (ThumbnailsGenerationJob job : stuckJobs) {
+      if (job.getRetryCount() >= config.maxRetries) {
+        log.warn("[{}] Job exceeded max retries ({}), marking as FAILURE", job.getStrId(), config.maxRetries);
+        job.fail(FailureReason.UNKNOWN);
+      } else {
+        log.warn("[{}] Retrying stuck job (attempt {})", job.getStrId(), job.getRetryCount() + 1);
+        job.retry();
+        applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobRetryEvent(job.getId()));
+      }
+      thumbnailsGenerationJobRepository.save(job);
+    }
+  }
+
+  @Transactional
   public ThumbnailsGenerationJobDTO create(String accountId, ThumbnailsGenerationJobCreationDTO dto) {
     var accountLongId = Util.validateTSID(accountId);
     var account = accountRepository.findById(accountLongId)
@@ -175,19 +194,22 @@ public class ThumbnailsGenerationJobService {
   public void receive(String id) {
     thumbnailsGenerationJobRepository.findById(Util.validateTSID(id)).ifPresentOrElse(
         job -> {
-          ScheduledFuture<?> heartbeat = heartbeatScheduler.scheduleAtFixedRate(
-              () -> thumbnailsGenerationJobRepository.updateHeartbeat(job.getId(), Instant.now()),
-              0,
-              config.heartbeatIntervalSeconds,
-              TimeUnit.SECONDS
-          );
-          activeHeartbeats.put(job.getId(), heartbeat);
           job.receive();
           thumbnailsGenerationJobRepository.save(job);
           applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobReceivedEvent(job.getId()));
         },
         () -> { throw new ResourceNotFoundException(); }
     );
+  }
+
+  void startHeartbeat(Long jobId) {
+    ScheduledFuture<?> heartbeat = heartbeatScheduler.scheduleAtFixedRate(
+        () -> thumbnailsGenerationJobRepository.updateHeartbeat(jobId, Instant.now()),
+        0,
+        config.heartbeatIntervalSeconds,
+        TimeUnit.SECONDS
+    );
+    activeHeartbeats.put(jobId, heartbeat);
   }
 
   void process(Long jobId) {
@@ -222,17 +244,19 @@ public class ThumbnailsGenerationJobService {
         videoPath = videoUrl;
       }
 
+      List<ConfigProcessingStats> statsList = new ArrayList<>();
       for (ThumbnailConfig cfg : configs) {
         Path configFolder = jobFolder.resolve(cfg.folderName());
-        long t = System.nanoTime();
         try {
-          VideoThumbnailGenerator.run(videoPath, configFolder, cfg, job.getStreamIndex(), config.ffmpegThreads);
+          ConfigProcessingStats stats = VideoThumbnailGenerator.run(videoPath, configFolder, cfg, job.getStreamIndex(), config.ffmpegThreads);
+          statsList.add(stats);
+          log.info("[{}] Transcoding ({}) extraction={}ms postProcessing={}ms",
+              strId, cfg.folderName(), stats.extractionMs(), stats.postProcessingMs());
         } catch (InvalidThumbnailConfigException e) {
           throw e;
         } catch (Exception e) {
           throw new JobFailureException(FailureReason.PROCESSING_FAILED, e);
         }
-        log.info("[{}] Transcoding ({}): {}s", strId, cfg.folderName(), elapsed(t));
       }
 
       long t = System.nanoTime();
@@ -259,6 +283,7 @@ public class ThumbnailsGenerationJobService {
 
       transactionTemplate.executeWithoutResult(status -> {
         var j = thumbnailsGenerationJobRepository.findById(jobId).orElseThrow(ResourceNotFoundException::new);
+        j.recordStats(statsList);
         j.succeed();
         thumbnailsGenerationJobRepository.save(j);
       });
@@ -269,8 +294,15 @@ public class ThumbnailsGenerationJobService {
       try {
         transactionTemplate.executeWithoutResult(status -> {
           var j = thumbnailsGenerationJobRepository.findById(jobId).orElseThrow(ResourceNotFoundException::new);
-          j.fail(reason);
-          thumbnailsGenerationJobRepository.save(j);
+          if ((reason == FailureReason.UPLOAD_FAILED || reason == FailureReason.PROCESSING_FAILED) && j.getRetryCount() < config.maxRetries) {
+            log.warn("[{}] {} failed, scheduling retry (attempt {})", strId, reason, j.getRetryCount() + 1);
+            j.retry();
+            thumbnailsGenerationJobRepository.save(j);
+            applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobRetryEvent(j.getId()));
+          } else {
+            j.fail(reason);
+            thumbnailsGenerationJobRepository.save(j);
+          }
         });
       } catch (Exception saveException) {
         log.error("[{}] Failed to persist failure status", strId, saveException);

@@ -30,12 +30,22 @@ public class JobSpecService {
   public JobSpecDTO create(String accountId, JobSpecCreationDTO dto) {
     var account = accountRepository.findById(Util.validateTSID(accountId))
         .orElseThrow(ResourceNotFoundException::new);
+    if (jobSpecRepository.countByAccountId(account.getId()) >= 100)
+      throw new InvalidThumbnailConfigException("Job spec limit of 100 reached");
     if (jobSpecRepository.existsByAccountIdAndName(account.getId(), dto.getName().trim()))
       throw new InvalidThumbnailConfigException("A job spec with this name already exists");
     var configs = dto.getConfigs().stream().map(JobSpecService::toConfig).toList();
     var jobSpec = new JobSpec(account, dto.getName(), dto.getDescription(), configs);
     jobSpecRepository.save(jobSpec);
     return JobSpecDTO.from(jobSpec);
+  }
+
+  @Transactional
+  public void delete(String accountId, String jobSpecId) {
+    var jobSpec = jobSpecRepository
+        .findByAccountIdAndId(Util.validateTSID(accountId), Util.validateTSID(jobSpecId))
+        .orElseThrow(ResourceNotFoundException::new);
+    jobSpecRepository.delete(jobSpec);
   }
 
   public List<JobSpecDTO> findAll(String accountId) {

@@ -38,4 +38,11 @@ public class JobSpecController {
         var userCtx = UserContextHolder.get();
         return ResponseEntity.ok(jobSpecService.findById(userCtx.getAccountId(), jobSpecId));
     }
+
+    @DeleteMapping("/{jobSpecId}")
+    public ResponseEntity<Void> delete(@PathVariable String jobSpecId) {
+        var userCtx = UserContextHolder.get();
+        jobSpecService.delete(userCtx.getAccountId(), jobSpecId);
+        return ResponseEntity.noContent().build();
+    }
 }

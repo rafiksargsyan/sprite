@@ -10,4 +10,5 @@ public interface JobSpecRepository extends JpaRepository<JobSpec, Long> {
   Optional<JobSpec> findByAccountIdAndId(Long accountId, Long id);
   List<JobSpec> findByAccountId(Long accountId);
   boolean existsByAccountIdAndName(Long accountId, String name);
+  long countByAccountId(Long accountId);
 }

@@ -3,7 +3,8 @@ package com.rsargsyan.sprite.main_ctx.core.domain.valueobject;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.rsargsyan.sprite.main_ctx.core.exception.InvalidThumbnailConfigException;
 
-public record JpgThumbnailConfig(int resolution, SpriteSize spriteSize, int quality, int interval, String folderName) implements ThumbnailConfig {
+public record JpgThumbnailConfig(int resolution, SpriteSize spriteSize, int quality, int interval,
+                                 String folderName) implements ThumbnailConfig {
   private static final java.util.regex.Pattern FOLDER_NAME_PATTERN =
       java.util.regex.Pattern.compile("^[a-zA-Z0-9._-]{1,63}$");
 

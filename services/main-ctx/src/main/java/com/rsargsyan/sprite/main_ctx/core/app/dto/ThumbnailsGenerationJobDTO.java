@@ -28,16 +28,17 @@ public class ThumbnailsGenerationJobDTO {
         ? JobFailureReason.from(job.getFailureReason())
         : null;
     return new ThumbnailsGenerationJobDTO(
-        job.getStrId(), job.getVideoURL(), externalStatus(job.getStatus()), job.getJobSpec(),
+        job.getStrId(), job.getVideoURL(), externalStatus(job), job.getJobSpec(),
         job.getStreamIndex(), job.isPreview(), previewAvailable, job.getCreatedAt(), job.getStartedAt(), job.getFinishedAt(),
         downloadUrl, failureReason
     );
   }
 
-  private static String externalStatus(ThumbnailsGenerationJob.Status status) {
-    return switch (status) {
-      case QUEUED, RECEIVED -> "SUBMITTED";
-      default -> status.name();
+  private static String externalStatus(ThumbnailsGenerationJob job) {
+    return switch (job.getStatus()) {
+      case QUEUED, RECEIVED -> job.getRetryCount() > 0 ? "IN_PROGRESS" : "SUBMITTED";
+      case RETRYING -> "IN_PROGRESS";
+      default -> job.getStatus().name();
     };
   }
 }

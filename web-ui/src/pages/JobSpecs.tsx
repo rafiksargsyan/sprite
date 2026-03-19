@@ -30,8 +30,9 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useAuth } from '../hooks/useAuth';
-import { listJobSpecs, createJobSpec } from '../api/jobSpecs';
+import { listJobSpecs, createJobSpec, deleteJobSpec } from '../api/jobSpecs';
 import type { JobSpecDTO, ThumbnailConfigRequest } from '../types/api.types';
+import { configChipLabel, ConfigDetailDialog } from '../components/ConfigDetailDialog';
 
 type WebpPreset = 'default' | 'picture' | 'photo' | 'drawing' | 'icon' | 'text';
 
@@ -81,6 +82,7 @@ function configDraftToRequest(c: ConfigDraft): ThumbnailConfigRequest {
   return { format: 'webp', resolution: c.resolution, spriteSize, quality: c.quality, interval: c.interval, method: c.method, lossless: c.lossless, preset: c.preset, folderName: c.folderName };
 }
 
+
 export function JobSpecs() {
   const { user, accountId } = useAuth();
   const [specs, setSpecs] = useState<JobSpecDTO[]>([]);
@@ -88,6 +90,8 @@ export function JobSpecs() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [selectedConfig, setSelectedConfig] = useState<ThumbnailConfigResponse | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -117,6 +121,19 @@ export function JobSpecs() {
   const updateConfig = (i: number, patch: Partial<ConfigDraft>) =>
     setConfigs((prev) => prev.map((c, idx) => (idx === i ? { ...c, ...patch } : c)));
 
+  const handleDelete = async (id: string) => {
+    if (!user || !accountId) return;
+    setDeletingId(id);
+    try {
+      await deleteJobSpec(user, accountId, id);
+      setSpecs((prev) => prev.filter((s) => s.id !== id));
+    } catch {
+      setError('Failed to delete job spec');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const handleSave = async () => {
     if (!user || !accountId) return;
     setSaving(true);
@@ -140,7 +157,7 @@ export function JobSpecs() {
     <Box>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h5" fontWeight="bold">Job Specs</Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={openDialog}>
+        <Button variant="contained" color="secondary" startIcon={<AddIcon />} onClick={openDialog}>
           New Spec
         </Button>
       </Stack>
@@ -157,6 +174,7 @@ export function JobSpecs() {
                 <TableCell>Name</TableCell>
                 <TableCell>Description</TableCell>
                 <TableCell>Configs</TableCell>
+                <TableCell />
               </TableRow>
             </TableHead>
             <TableBody>
@@ -167,9 +185,14 @@ export function JobSpecs() {
                   <TableCell>
                     <Stack direction="row" gap={0.5} flexWrap="wrap">
                       {s.configs.map((c, i) => (
-                        <Chip key={i} size="small" label={c.format === 'blurhash' ? `${c.format}` : `${c.format} ${c.resolution}p`} />
+                        <Chip key={i} size="small" label={configChipLabel(c)} onClick={() => setSelectedConfig(c)} sx={{ cursor: 'pointer' }} />
                       ))}
                     </Stack>
+                  </TableCell>
+                  <TableCell align="right">
+                    <IconButton size="small" onClick={() => handleDelete(s.id)} disabled={deletingId === s.id}>
+                      {deletingId === s.id ? <CircularProgress size={16} /> : <DeleteIcon fontSize="small" />}
+                    </IconButton>
                   </TableCell>
                 </TableRow>
               ))}
@@ -177,6 +200,10 @@ export function JobSpecs() {
           </Table>
         </TableContainer>
       )}
+
+      {error && !dialogOpen && <Typography color="error" mt={2}>{error}</Typography>}
+
+      {selectedConfig && <ConfigDetailDialog config={selectedConfig} onClose={() => setSelectedConfig(null)} />}
 
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>New Job Spec</DialogTitle>

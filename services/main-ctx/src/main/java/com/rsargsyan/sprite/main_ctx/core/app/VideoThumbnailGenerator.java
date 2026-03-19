@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.AvifThumbnailConfig;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.BlurhashThumbnailConfig;
+import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.ConfigProcessingStats;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.ThumbnailConfig;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.WebpThumbnailConfig;
 import com.rsargsyan.sprite.main_ctx.core.exception.InvalidThumbnailConfigException;
@@ -19,7 +20,8 @@ import java.util.stream.Stream;
 
 public class VideoThumbnailGenerator {
 
-  public static void run(String videoFilePath, Path configFolder, ThumbnailConfig config, Integer streamIndex, int threads) throws Exception {
+  public static ConfigProcessingStats run(String videoFilePath, Path configFolder, ThumbnailConfig config,
+                                          Integer streamIndex, int threads) throws Exception {
 
     Files.createDirectories(configFolder);
 
@@ -27,8 +29,12 @@ public class VideoThumbnailGenerator {
 
     int resolution = config instanceof BlurhashThumbnailConfig ? 32 : config.resolution();
     int jpegQuality = config instanceof BlurhashThumbnailConfig ? 8 : 2;
-    generateThumbnails(videoFilePath, configFolder, resolution, config.interval(), fps, streamIndex, threads, jpegQuality);
 
+    long extractionStart = System.currentTimeMillis();
+    generateThumbnails(videoFilePath, configFolder, resolution, config.interval(), fps, streamIndex, threads, jpegQuality);
+    long extractionMs = System.currentTimeMillis() - extractionStart;
+
+    long postProcessingStart = System.currentTimeMillis();
     if (config instanceof BlurhashThumbnailConfig blurhash) {
       generateBlurhashVtt(configFolder, blurhash.interval(), blurhash.componentsX(), blurhash.componentsY());
     } else {
@@ -41,19 +47,21 @@ public class VideoThumbnailGenerator {
       generateWebVtt(configFolder, thumbnailsCount, spriteS, spriteC, dim.width, dim.height,
           config.interval(), config.format());
     }
-
+    long postProcessingMs = System.currentTimeMillis() - postProcessingStart;
     deleteThumbnails(configFolder);
+
+    return new ConfigProcessingStats(config.folderName(), extractionMs, postProcessingMs);
   }
 
   private static double resolveFps(String videoUrl, Integer streamIndex) throws Exception {
 
-    ProcessBuilder pb = new ProcessBuilder(
-        "ffprobe",
-        "-v", "error",
-        "-print_format", "json",
-        "-show_streams",
-        "-i", videoUrl
-    );
+    boolean isUrl = videoUrl.startsWith("http://") || videoUrl.startsWith("https://") || videoUrl.startsWith("rtmp://") || videoUrl.startsWith("rtsp://");
+    List<String> cmd = new ArrayList<>(List.of("ffprobe", "-v", "error", "-print_format", "json", "-show_streams"));
+    if (isUrl) {
+      cmd.addAll(List.of("-timeout", "30000000", "-rw_timeout", "30000000"));
+    }
+    cmd.addAll(List.of("-i", videoUrl));
+    ProcessBuilder pb = new ProcessBuilder(cmd);
 
     Process process = pb.start();
     String json = new String(process.getInputStream().readAllBytes());
@@ -110,8 +118,10 @@ public class VideoThumbnailGenerator {
                                          int jpegQuality) throws Exception {
 
     String mapFlag = streamIndex != null ? "-map 0:" + streamIndex + " " : "";
+    boolean isUrl = videoUrl.startsWith("http://") || videoUrl.startsWith("https://") || videoUrl.startsWith("rtmp://") || videoUrl.startsWith("rtsp://");
+    String networkFlags = isUrl ? "-timeout 30000000 -rw_timeout 30000000 " : "";
     String cmd = String.format(
-        "ffmpeg -threads %d -skip_frame noref -i '%s' " + mapFlag + "-vf \"select='isnan(prev_selected_t)+gte(t-floor(prev_selected_t),%d)',scale=-2:%d,setpts=N/%f/TB\" -vsync vfr -q:v %d thumbnail-%%06d.jpg",
+        "ffmpeg " + networkFlags + "-threads %d -skip_frame noref -i '%s' " + mapFlag + "-vf \"select='isnan(prev_selected_t)+gte(t-floor(prev_selected_t),%d)',scale=-2:%d,setpts=N/%f/TB\" -vsync vfr -q:v %d thumbnail-%%06d.jpg",
         threads,
         videoUrl,
         interval,

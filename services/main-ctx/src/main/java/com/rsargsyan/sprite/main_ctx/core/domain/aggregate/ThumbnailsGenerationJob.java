@@ -1,5 +1,6 @@
 package com.rsargsyan.sprite.main_ctx.core.domain.aggregate;
 
+import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.ConfigProcessingStats;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.EmbeddedJobSpec;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.FailureReason;
 import com.rsargsyan.sprite.main_ctx.core.exception.IllegalJobStateTransitionException;
@@ -16,6 +17,7 @@ import org.hibernate.annotations.Type;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.time.Instant;
+import java.util.List;
 
 @Entity
 @Getter
@@ -43,6 +45,12 @@ public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
 
   private Instant lastHeartbeatAt;
 
+  private int retryCount;
+
+  @Type(JsonType.class)
+  @Column(columnDefinition = "jsonb")
+  private List<ConfigProcessingStats> processingStats;
+
   @SuppressWarnings("unused")
   ThumbnailsGenerationJob() {}
 
@@ -62,7 +70,7 @@ public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
   }
 
   public void queue() {
-    if (this.status != Status.SUBMITTED) {
+    if (this.status != Status.SUBMITTED && this.status != Status.RETRYING) {
       throw new IllegalJobStateTransitionException(this.status, Status.QUEUED);
     }
     this.status = Status.QUEUED;
@@ -86,8 +94,20 @@ public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
     touch();
   }
 
+  public void retry() {
+    this.status = Status.RETRYING;
+    this.startedAt = null;
+    this.lastHeartbeatAt = null;
+    this.retryCount++;
+    touch();
+  }
+
   public void heartbeat() {
     this.lastHeartbeatAt = Instant.now();
+  }
+
+  public void recordStats(List<ConfigProcessingStats> stats) {
+    this.processingStats = stats;
   }
 
   public void succeed() {
@@ -111,6 +131,7 @@ public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
     QUEUED,
     RECEIVED,
     IN_PROGRESS,
+    RETRYING,
     SUCCESS,
     FAILURE
   }

@@ -17,3 +17,7 @@ export function createJobSpec(
     body: JSON.stringify(body),
   });
 }
+
+export function deleteJobSpec(user: User, accountId: string, jobSpecId: string): Promise<void> {
+  return apiRequest<void>(`/job-spec/${jobSpecId}`, user, { method: 'DELETE', accountId });
+}

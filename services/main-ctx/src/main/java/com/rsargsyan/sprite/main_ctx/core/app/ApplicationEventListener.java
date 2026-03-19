@@ -54,9 +54,27 @@ public class ApplicationEventListener {
     );
   }
 
+  @EventListener
+  public void handleThumbnailsGenerationJobRetryEvent(ThumbnailsGenerationJobRetryEvent event) {
+    thumbnailsGenerationJobRepository.findById(event.jobId()).ifPresentOrElse(
+        job -> {
+          if (job.getStatus() == ThumbnailsGenerationJob.Status.RETRYING) {
+            job.queue();
+            thumbnailsGenerationJobRepository.save(job);
+            rabbitTemplate.convertAndSend(config.topicExchangeName, "test", job.getStrId(), m -> {
+              m.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
+              return m;
+            });
+          }
+        },
+        () -> log.warn("Job not found for retry event: {}", event.jobId())
+    );
+  }
+
   @Async
   @TransactionalEventListener
   public void handleThumbnailsGenerationJobReceivedEvent(ThumbnailsGenerationJobReceivedEvent event) {
+    thumbnailsGenerationJobService.startHeartbeat(event.jobId());
     processingExecutor.submit(() -> {
       try {
         thumbnailsGenerationJobService.process(event.jobId());

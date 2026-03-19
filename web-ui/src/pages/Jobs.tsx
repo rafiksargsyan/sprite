@@ -37,7 +37,8 @@ import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import { useAuth } from '../hooks/useAuth';
 import { listJobs, createJob, getJobLimits, getJobPreviewFiles, getJobPreviewVtt } from '../api/jobs';
 import { listJobSpecs } from '../api/jobSpecs';
-import type { ThumbnailsGenerationJobDTO, JobSpecDTO, PreviewFilesResponse } from '../types/api.types';
+import type { ThumbnailsGenerationJobDTO, JobSpecDTO, PreviewFilesResponse, ThumbnailConfigResponse } from '../types/api.types';
+import { configChipLabel, ConfigDetailDialog } from '../components/ConfigDetailDialog';
 
 const fmt = (ts: string | null) =>
   ts ? new Date(ts).toLocaleString() : '—';
@@ -284,6 +285,7 @@ export function Jobs() {
   const [preview, setPreview] = useState(false);
   const [maxFileSizeBytes, setMaxFileSizeBytes] = useState<number | null>(null);
   const [previewJob, setPreviewJob] = useState<ThumbnailsGenerationJobDTO | null>(null);
+  const [selectedConfig, setSelectedConfig] = useState<ThumbnailConfigResponse | null>(null);
 
   useEffect(() => {
     getJobLimits().then((l) => setMaxFileSizeBytes(l.maxFileSizeBytes)).catch(() => {});
@@ -330,7 +332,7 @@ export function Jobs() {
     <Box>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h5" fontWeight="bold">Jobs</Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={openDialog} disabled={specs.length === 0}>
+        <Button variant="contained" color="secondary" startIcon={<AddIcon />} onClick={openDialog} disabled={specs.length === 0}>
           New Job
         </Button>
       </Stack>
@@ -380,7 +382,7 @@ export function Jobs() {
                   <TableCell>
                     <Stack direction="row" gap={0.5} flexWrap="wrap">
                       {job.jobSpec.configs.map((c, i) => (
-                        <Chip key={i} size="small" label={c.format === 'blurhash' ? `${c.format}` : `${c.format} ${c.resolution}p`} />
+                        <Chip key={i} size="small" label={configChipLabel(c)} onClick={() => setSelectedConfig(c)} sx={{ cursor: 'pointer' }} />
                       ))}
                     </Stack>
                   </TableCell>
@@ -427,8 +429,16 @@ export function Jobs() {
                     </Tooltip>
                   </TableCell>
                   <TableCell>
-                    {job.preview && job.status === 'SUCCESS' && (
-                      <Tooltip title={job.previewAvailable ? '' : 'Preview expired (available for 2 hours after completion)'}>
+                    {job.preview && (
+                      <Tooltip title={
+                        job.status === 'FAILURE'
+                          ? 'Job failed'
+                          : job.status !== 'SUCCESS'
+                            ? 'Job not finished yet'
+                            : !job.previewAvailable
+                              ? 'Preview expired (available for 2 hours after completion)'
+                              : ''
+                      }>
                         <span>
                           <Button
                             size="small"
@@ -470,6 +480,8 @@ export function Jobs() {
           onClose={() => setPreviewJob(null)}
         />
       )}
+
+      {selectedConfig && <ConfigDetailDialog config={selectedConfig} onClose={() => setSelectedConfig(null)} />}
 
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>New Job</DialogTitle>

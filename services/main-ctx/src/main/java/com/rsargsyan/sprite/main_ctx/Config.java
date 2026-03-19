@@ -49,6 +49,12 @@ public class Config {
   @Value("${job.heartbeat-interval-seconds:30}")
   public int heartbeatIntervalSeconds;
 
+  @Value("${job.stale-heartbeat-seconds:120}")
+  public int staleHeartbeatSeconds;
+
+  @Value("${job.max-retries:3}")
+  public int maxRetries;
+
   @Value("${job.base-output-folder}")
   public String baseOutputFolder;
 

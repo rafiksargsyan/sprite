@@ -11,6 +11,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 public interface ThumbnailsGenerationJobRepository extends JpaRepository<ThumbnailsGenerationJob, Long> {
@@ -21,4 +22,7 @@ public interface ThumbnailsGenerationJobRepository extends JpaRepository<Thumbna
   @Transactional
   @Query("UPDATE ThumbnailsGenerationJob j SET j.lastHeartbeatAt = :now WHERE j.id = :id")
   void updateHeartbeat(@Param("id") Long id, @Param("now") Instant now);
+
+  @Query("SELECT j FROM ThumbnailsGenerationJob j WHERE j.status IN ('RECEIVED', 'IN_PROGRESS') AND j.lastHeartbeatAt < :threshold")
+  List<ThumbnailsGenerationJob> findStuckJobs(@Param("threshold") Instant threshold);
 }

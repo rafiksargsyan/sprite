@@ -118,6 +118,7 @@ export function ApiKeys() {
         <Typography variant="h5" fontWeight="bold">API Keys</Typography>
         <Button
           variant="contained"
+          color="secondary"
           startIcon={<AddIcon />}
           onClick={openCreate}
           disabled={keys.length >= 2}
