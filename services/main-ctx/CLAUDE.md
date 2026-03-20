@@ -23,7 +23,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Architecture
 
-This is a **Spring Boot 3.5.7 / Java 17** microservice for the Sprite platform — a video thumbnail sprite sheet generation service. It follows **hexagonal architecture (ports & adapters)** organized under `src/main/java/com/rsargsyan/sprite/main_ctx/`:
+This is a **Spring Boot 3.5.7 / Java 21** microservice for the Sprite platform — a video thumbnail sprite sheet generation service. It follows **hexagonal architecture (ports & adapters)** organized under `src/main/java/com/rsargsyan/sprite/main_ctx/`:
 
 ```
 adapters/driving/       ← Inbound: REST controllers, security filters, RabbitMQ workers

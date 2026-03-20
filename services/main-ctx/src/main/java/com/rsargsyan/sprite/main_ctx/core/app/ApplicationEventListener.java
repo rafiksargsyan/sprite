@@ -14,6 +14,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 
 @Slf4j
 @Component
@@ -24,6 +25,7 @@ public class ApplicationEventListener {
   private final ThumbnailsGenerationJobService thumbnailsGenerationJobService;
   private final Config config;
   private final ExecutorService processingExecutor;
+  private final Semaphore processingSemaphore;
 
   @Autowired
   public ApplicationEventListener(ThumbnailsGenerationJobRepository thumbnailsGenerationJobRepository,
@@ -34,7 +36,8 @@ public class ApplicationEventListener {
     this.rabbitTemplate = rabbitTemplate;
     this.thumbnailsGenerationJobService = thumbnailsGenerationJobService;
     this.config = config;
-    this.processingExecutor = Executors.newFixedThreadPool(config.processingPoolSize);
+    this.processingExecutor = Executors.newVirtualThreadPerTaskExecutor();
+    this.processingSemaphore = new Semaphore(config.processingPoolSize);
   }
 
   @EventListener
@@ -77,7 +80,12 @@ public class ApplicationEventListener {
     thumbnailsGenerationJobService.startHeartbeat(event.jobId());
     processingExecutor.submit(() -> {
       try {
-        thumbnailsGenerationJobService.process(event.jobId());
+        processingSemaphore.acquire();
+        try {
+          thumbnailsGenerationJobService.process(event.jobId());
+        } finally {
+          processingSemaphore.release();
+        }
       } catch (Exception e) {
         log.error("Unexpected error processing job {}", event.jobId(), e);
       }

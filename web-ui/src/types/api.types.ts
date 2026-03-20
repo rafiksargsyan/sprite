@@ -137,6 +137,7 @@ export interface ThumbnailsGenerationJobDTO {
   finishedAt: string | null;
   downloadUrl: string | null;
   failureReason: JobFailureReason | null;
+  extractionCost: number | null;
 }
 
 export interface ThumbnailsGenerationJobCreationRequest {

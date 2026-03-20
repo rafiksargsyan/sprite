@@ -6,6 +6,7 @@ import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.AvifThumbnailConfig
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.BlurhashThumbnailConfig;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.ConfigProcessingStats;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.ThumbnailConfig;
+import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.VideoCodec;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.WebpThumbnailConfig;
 import com.rsargsyan.sprite.main_ctx.core.exception.InvalidThumbnailConfigException;
 import io.trbl.blurhash.BlurHash;
@@ -20,12 +21,14 @@ import java.util.stream.Stream;
 
 public class VideoThumbnailGenerator {
 
+  public static VideoProbeResult probe(String videoUrl, Integer streamIndex) throws Exception {
+    return probeVideo(videoUrl, streamIndex);
+  }
+
   public static ConfigProcessingStats run(String videoFilePath, Path configFolder, ThumbnailConfig config,
-                                          Integer streamIndex, int threads) throws Exception {
+                                          Integer streamIndex, int threads, double fps) throws Exception {
 
     Files.createDirectories(configFolder);
-
-    double fps = resolveFps(videoFilePath, streamIndex);
 
     int resolution = config instanceof BlurhashThumbnailConfig ? 32 : config.resolution();
     int jpegQuality = config instanceof BlurhashThumbnailConfig ? 8 : 2;
@@ -53,10 +56,10 @@ public class VideoThumbnailGenerator {
     return new ConfigProcessingStats(config.folderName(), extractionMs, postProcessingMs);
   }
 
-  private static double resolveFps(String videoUrl, Integer streamIndex) throws Exception {
+  private static VideoProbeResult probeVideo(String videoUrl, Integer streamIndex) throws Exception {
 
     boolean isUrl = videoUrl.startsWith("http://") || videoUrl.startsWith("https://") || videoUrl.startsWith("rtmp://") || videoUrl.startsWith("rtsp://");
-    List<String> cmd = new ArrayList<>(List.of("ffprobe", "-v", "error", "-print_format", "json", "-show_streams"));
+    List<String> cmd = new ArrayList<>(List.of("ffprobe", "-v", "error", "-print_format", "json", "-show_streams", "-show_format"));
     if (isUrl) {
       cmd.addAll(List.of("-timeout", "30000000", "-rw_timeout", "30000000"));
     }
@@ -105,7 +108,16 @@ public class VideoThumbnailGenerator {
 
     String rate = videoStream.get("r_frame_rate").asText();
     String[] parts = rate.split("/");
-    return Double.parseDouble(parts[0]) / Double.parseDouble(parts[1]);
+    double fps = Double.parseDouble(parts[0]) / Double.parseDouble(parts[1]);
+
+    String codecName = videoStream.path("codec_name").asText(null);
+    VideoCodec codec = VideoCodec.fromFfprobeName(codecName);
+
+    int inputRes = videoStream.path("height").asInt(720);
+
+    double durationSec = root.path("format").path("duration").asDouble(0);
+
+    return new VideoProbeResult(fps, (int) durationSec, codec, inputRes);
   }
 
   private static void generateThumbnails(String videoUrl,

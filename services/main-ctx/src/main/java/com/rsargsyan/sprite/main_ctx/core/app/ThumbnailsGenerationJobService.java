@@ -234,8 +234,22 @@ public class ThumbnailsGenerationJobService {
 
       checkVideoAccessibility(videoUrl);
 
+      long probeT = System.nanoTime();
+      VideoProbeResult probe = VideoThumbnailGenerator.probe(videoUrl, job.getStreamIndex());
+      log.info("[{}] Probe: {}s (codec={}, inputRes={}, duration={}s)", strId, elapsed(probeT),
+          probe.codec(), probe.inputRes(), probe.durationSec());
+
+      double totalExtractionCost = ExtractionCostCalculator.calculate(
+          probe.durationSec(), probe.codec(), probe.inputRes());
+      transactionTemplate.executeWithoutResult(s -> {
+        ThumbnailsGenerationJob j = thumbnailsGenerationJobRepository.findById(job.getId()).orElseThrow();
+        j.recordExtractionCost(totalExtractionCost);
+        thumbnailsGenerationJobRepository.save(j);
+      });
+      log.info("[{}] Extraction cost: {}", strId, totalExtractionCost);
+
       String videoPath;
-      if (configs.size() > 1 && hasSufficientDiskSpace()) {
+      if (hasSufficientDiskSpace()) {
         Files.createDirectories(jobFolder);
         long t = System.nanoTime();
         videoPath = downloadVideo(videoUrl, jobFolder).toString();
@@ -248,7 +262,7 @@ public class ThumbnailsGenerationJobService {
       for (ThumbnailConfig cfg : configs) {
         Path configFolder = jobFolder.resolve(cfg.folderName());
         try {
-          ConfigProcessingStats stats = VideoThumbnailGenerator.run(videoPath, configFolder, cfg, job.getStreamIndex(), config.ffmpegThreads);
+          ConfigProcessingStats stats = VideoThumbnailGenerator.run(videoPath, configFolder, cfg, job.getStreamIndex(), config.ffmpegThreads, probe.fps());
           statsList.add(stats);
           log.info("[{}] Transcoding ({}) extraction={}ms postProcessing={}ms",
               strId, cfg.folderName(), stats.extractionMs(), stats.postProcessingMs());

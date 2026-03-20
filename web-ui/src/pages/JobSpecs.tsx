@@ -171,6 +171,7 @@ export function JobSpecs() {
           <Table>
             <TableHead>
               <TableRow>
+                <TableCell>ID</TableCell>
                 <TableCell>Name</TableCell>
                 <TableCell>Description</TableCell>
                 <TableCell>Configs</TableCell>
@@ -180,6 +181,7 @@ export function JobSpecs() {
             <TableBody>
               {specs.map((s) => (
                 <TableRow key={s.id} hover>
+                  <TableCell><Typography variant="body2" fontFamily="monospace">{s.id}</Typography></TableCell>
                   <TableCell><Typography fontWeight="medium">{s.name}</Typography></TableCell>
                   <TableCell><Typography color="text.secondary">{s.description ?? '—'}</Typography></TableCell>
                   <TableCell>

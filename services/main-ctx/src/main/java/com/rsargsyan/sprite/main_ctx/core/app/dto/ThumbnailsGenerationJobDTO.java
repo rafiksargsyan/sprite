@@ -22,6 +22,7 @@ public class ThumbnailsGenerationJobDTO {
   Instant finishedAt;
   String downloadUrl;
   @Nullable JobFailureReason failureReason;
+  @Nullable Double extractionCost;
 
   public static ThumbnailsGenerationJobDTO from(ThumbnailsGenerationJob job, String downloadUrl, boolean previewAvailable) {
     JobFailureReason failureReason = job.getFailureReason() != null
@@ -30,7 +31,7 @@ public class ThumbnailsGenerationJobDTO {
     return new ThumbnailsGenerationJobDTO(
         job.getStrId(), job.getVideoURL(), externalStatus(job), job.getJobSpec(),
         job.getStreamIndex(), job.isPreview(), previewAvailable, job.getCreatedAt(), job.getStartedAt(), job.getFinishedAt(),
-        downloadUrl, failureReason
+        downloadUrl, failureReason, job.getExtractionCost()
     );
   }
 

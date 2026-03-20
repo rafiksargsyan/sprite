@@ -116,9 +116,6 @@ function PreviewDialog({ job, user, accountId, onClose }: PreviewDialogProps) {
   useEffect(() => {
     if (!selectedConfig) return;
     setLoading(true);
-    setFiles(null);
-    setCues([]);
-    setSheetSize(null);
     Promise.all([
       getJobPreviewFiles(user, accountId, job.id, selectedConfig),
       getJobPreviewVtt(user, accountId, job.id, selectedConfig),
@@ -126,7 +123,7 @@ function PreviewDialog({ job, user, accountId, onClose }: PreviewDialogProps) {
       .then(([f, vtt]) => {
         setFiles(f);
         setCues(parseVtt(vtt));
-        setSliderValue(0);
+        setSheetSize(null);
       })
       .finally(() => setLoading(false));
   }, [selectedConfig]);
@@ -151,7 +148,7 @@ function PreviewDialog({ job, user, accountId, onClose }: PreviewDialogProps) {
     <Dialog open onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>Preview — {job.id.slice(0, 12)}…</DialogTitle>
       <DialogContent>
-        <Stack spacing={3} mt={1}>
+        <Stack spacing={3} mt={1} sx={{ position: 'relative' }}>
           <Stack direction="row" spacing={2} alignItems="center">
             <FormControl size="small" sx={{ minWidth: 180 }}>
               <InputLabel>Config</InputLabel>
@@ -182,10 +179,16 @@ function PreviewDialog({ job, user, accountId, onClose }: PreviewDialogProps) {
             </Box>
           </Stack>
 
-          {loading && <Box display="flex" justifyContent="center"><CircularProgress /></Box>}
+          {loading && cue && (
+            <Box display="flex" justifyContent="center" alignItems="center" sx={{ position: 'absolute', inset: 0, zIndex: 1 }}>
+              <CircularProgress />
+            </Box>
+          )}
 
-          {!loading && cue && (
-            <Stack spacing={1} alignItems="center">
+          {!loading && !cue && <Box display="flex" justifyContent="center"><CircularProgress /></Box>}
+
+          {cue && (
+            <Stack spacing={1} alignItems="center" sx={{ opacity: loading ? 0.4 : 1, transition: 'opacity 0.2s' }}>
               {cue.type === 'blurhash' ? (
                 <canvas
                   ref={canvasRef}
@@ -246,7 +249,7 @@ function PreviewDialog({ job, user, accountId, onClose }: PreviewDialogProps) {
           )}
 
           {!loading && cues.length === 0 && (
-            <Typography color="text.secondary">No thumbnails found for this config.</Typography>
+            <Typography color="text.secondary" display="flex" justifyContent="center">No thumbnails found for this config.</Typography>
           )}
         </Stack>
       </DialogContent>
@@ -265,6 +268,13 @@ const STATUS_COLOR: Record<
   IN_PROGRESS: 'warning',
   SUCCESS: 'success',
   FAILURE: 'error',
+};
+
+const FAILURE_REASON_LABEL: Record<import('../types/api.types').JobFailureReason, string> = {
+  VIDEO_TOO_LARGE: 'Video too large',
+  VIDEO_NOT_ACCESSIBLE: 'Video not accessible',
+  INVALID_STREAM_INDEX: 'Invalid stream index',
+  SERVER_ERROR: 'Server error',
 };
 
 export function Jobs() {
@@ -359,6 +369,7 @@ export function Jobs() {
                 <TableCell>Created</TableCell>
                 <TableCell>Started</TableCell>
                 <TableCell>Finished</TableCell>
+                <TableCell>Extraction Cost</TableCell>
                 <TableCell>Download</TableCell>
                 <TableCell>Preview</TableCell>
               </TableRow>
@@ -367,17 +378,10 @@ export function Jobs() {
               {jobs.map((job) => (
                 <TableRow key={job.id} hover>
                   <TableCell>
-                    <Typography variant="body2" fontFamily="monospace">
-                      {job.id.slice(0, 12)}…
-                    </Typography>
+                    <Typography variant="body2" fontFamily="monospace">{job.id}</Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography
-                      variant="body2"
-                      sx={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                    >
-                      {job.videoUrl}
-                    </Typography>
+                    <Typography variant="body2">{job.videoUrl}</Typography>
                   </TableCell>
                   <TableCell>
                     <Stack direction="row" gap={0.5} flexWrap="wrap">
@@ -387,11 +391,13 @@ export function Jobs() {
                     </Stack>
                   </TableCell>
                   <TableCell>
-                    <Chip
-                      size="small"
-                      label={job.status}
-                      color={STATUS_COLOR[job.status]}
-                    />
+                    <Tooltip title={job.failureReason ? FAILURE_REASON_LABEL[job.failureReason] : ''}>
+                      <Chip
+                        size="small"
+                        label={job.status}
+                        color={STATUS_COLOR[job.status]}
+                      />
+                    </Tooltip>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" color="text.secondary" noWrap>{fmt(job.createdAt)}</Typography>
@@ -401,6 +407,11 @@ export function Jobs() {
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" color="text.secondary" noWrap>{fmt(job.finishedAt)}</Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2">
+                      {job.extractionCost != null ? Math.round(job.extractionCost) : '—'}
+                    </Typography>
                   </TableCell>
                   <TableCell>
                     <Tooltip title={
