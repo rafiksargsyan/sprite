@@ -32,9 +32,7 @@ export interface WebpConfigResponse {
   spriteSize: SpriteSizeResponse;
   quality: number;
   method: number;
-  lossless: boolean;
   interval: number;
-  preset: string;
   folderName: string;
 }
 
@@ -44,13 +42,11 @@ export interface AvifConfigResponse {
   spriteSize: SpriteSizeResponse;
   quality: number;
   interval: number;
-  speed: number;
   folderName: string;
 }
 
 export interface BlurhashConfigResponse {
   format: 'blurhash';
-  resolution: number;
   interval: number;
   componentsX: number;
   componentsY: number;
@@ -86,9 +82,7 @@ export interface WebpConfigRequest {
   spriteSize: SpriteSizeRequest;
   quality: number;
   method: number;
-  lossless: boolean;
   interval: number;
-  preset: string;
   folderName: string;
 }
 
@@ -98,7 +92,6 @@ export interface AvifConfigRequest {
   spriteSize: SpriteSizeRequest;
   quality: number;
   interval: number;
-  speed: number;
   folderName: string;
 }
 
@@ -137,7 +130,7 @@ export interface ThumbnailsGenerationJobDTO {
   finishedAt: string | null;
   downloadUrl: string | null;
   failureReason: JobFailureReason | null;
-  extractionCost: number | null;
+  cost: number | null;
 }
 
 export interface ThumbnailsGenerationJobCreationRequest {

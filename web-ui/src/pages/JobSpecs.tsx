@@ -3,21 +3,18 @@ import {
   Box,
   Button,
   Chip,
-  FormControl,
-  InputLabel,
+
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
-  FormControlLabel,
   IconButton,
   MenuItem,
   Paper,
   Select,
   Stack,
-  Switch,
   Table,
   TableBody,
   TableCell,
@@ -34,8 +31,6 @@ import { listJobSpecs, createJobSpec, deleteJobSpec } from '../api/jobSpecs';
 import type { JobSpecDTO, ThumbnailConfigRequest } from '../types/api.types';
 import { configChipLabel, ConfigDetailDialog } from '../components/ConfigDetailDialog';
 
-type WebpPreset = 'default' | 'picture' | 'photo' | 'drawing' | 'icon' | 'text';
-
 interface ConfigDraft {
   format: 'jpg' | 'webp' | 'avif' | 'blurhash';
   resolution: number;
@@ -44,9 +39,7 @@ interface ConfigDraft {
   quality: number;
   interval: number;
   method: number;
-  lossless: boolean;
-  preset: WebpPreset;
-  speed: number;
+
   componentsX: number;
   componentsY: number;
   folderName: string;
@@ -60,9 +53,7 @@ const defaultConfig = (): ConfigDraft => ({
   quality: 85,
   interval: 10,
   method: 4,
-  lossless: false,
-  preset: 'default',
-  speed: 6,
+
   componentsX: 4,
   componentsY: 3,
   folderName: '',
@@ -74,12 +65,12 @@ function configDraftToRequest(c: ConfigDraft): ThumbnailConfigRequest {
     return { format: 'jpg', resolution: c.resolution, spriteSize, quality: c.quality, interval: c.interval, folderName: c.folderName };
   }
   if (c.format === 'avif') {
-    return { format: 'avif', resolution: c.resolution, spriteSize, quality: c.quality, interval: c.interval, speed: c.speed, folderName: c.folderName };
+    return { format: 'avif', resolution: c.resolution, spriteSize, quality: c.quality, interval: c.interval, folderName: c.folderName };
   }
   if (c.format === 'blurhash') {
     return { format: 'blurhash', interval: c.interval, componentsX: c.componentsX, componentsY: c.componentsY, folderName: c.folderName };
   }
-  return { format: 'webp', resolution: c.resolution, spriteSize, quality: c.quality, interval: c.interval, method: c.method, lossless: c.lossless, preset: c.preset, folderName: c.folderName };
+  return { format: 'webp', resolution: c.resolution, spriteSize, quality: c.quality, interval: c.interval, method: c.method, folderName: c.folderName };
 }
 
 
@@ -251,8 +242,10 @@ export function JobSpecs() {
                       <MenuItem value="avif">AVIF</MenuItem>
                       <MenuItem value="blurhash">Blurhash</MenuItem>
                     </Select>
-                    <TextField size="small" label="Resolution (px height)" type="number" value={cfg.resolution}
-                      onChange={(e) => updateConfig(i, { resolution: +e.target.value })} sx={{ width: 160 }} />
+                    {cfg.format !== 'blurhash' && (
+                      <TextField size="small" label="Resolution (px height)" type="number" value={cfg.resolution}
+                        onChange={(e) => updateConfig(i, { resolution: +e.target.value })} sx={{ width: 160 }} />
+                    )}
                     <TextField size="small" label="Interval (s)" type="number" value={cfg.interval}
                       onChange={(e) => updateConfig(i, { interval: +e.target.value })} sx={{ width: 110 }} />
                     {cfg.format !== 'blurhash' && (
@@ -274,32 +267,10 @@ export function JobSpecs() {
                         onChange={(e) => updateConfig(i, { componentsY: +e.target.value })} sx={{ width: 150 }} />
                     </Stack>
                   )}
-                  {cfg.format === 'avif' && (
-                    <Stack direction="row" spacing={2} flexWrap="wrap" alignItems="center">
-                      <TextField size="small" label="Speed (0–8)" type="number" value={cfg.speed}
-                        onChange={(e) => updateConfig(i, { speed: +e.target.value })} sx={{ width: 110 }} />
-                    </Stack>
-                  )}
                   {cfg.format === 'webp' && (
                     <Stack direction="row" spacing={2} flexWrap="wrap" alignItems="center">
-                      <FormControl size="small" sx={{ minWidth: 110 }}>
-                        <InputLabel>Preset</InputLabel>
-                        <Select
-                          label="Preset"
-                          value={cfg.preset}
-                          onChange={(e) => updateConfig(i, { preset: e.target.value as WebpPreset })}
-                        >
-                          {(['default', 'picture', 'photo', 'drawing', 'icon', 'text'] as WebpPreset[]).map((p) => (
-                            <MenuItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
                       <TextField size="small" label="Method (0–6)" type="number" value={cfg.method}
                         onChange={(e) => updateConfig(i, { method: +e.target.value })} sx={{ width: 110 }} />
-                      <FormControlLabel
-                        control={<Switch checked={cfg.lossless} onChange={(e) => updateConfig(i, { lossless: e.target.checked })} />}
-                        label="Lossless"
-                      />
                     </Stack>
                   )}
                 </Stack>

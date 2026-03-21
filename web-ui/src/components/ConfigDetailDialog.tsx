@@ -23,12 +23,7 @@ export function ConfigDetailDialog({ config, onClose }: { config: ThumbnailConfi
     rows.push({ label: 'Components Y', value: (config as any).componentsY });
   }
   if (config.format === 'webp') {
-    rows.push({ label: 'Preset', value: (config as any).preset });
-    rows.push({ label: 'Method', value: (config as any).method });
-    rows.push({ label: 'Lossless', value: String((config as any).lossless) });
-  }
-  if (config.format === 'avif') {
-    rows.push({ label: 'Speed', value: (config as any).speed });
+    rows.push({ label: 'Method', value: config.method });
   }
   return (
     <Dialog open onClose={onClose} maxWidth="xs" fullWidth>

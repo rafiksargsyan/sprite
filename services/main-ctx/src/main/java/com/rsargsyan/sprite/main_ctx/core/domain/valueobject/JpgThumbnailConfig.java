@@ -22,4 +22,12 @@ public record JpgThumbnailConfig(int resolution, SpriteSize spriteSize, int qual
   public String format() {
     return "jpg";
   }
+
+  @Override
+  public double postProcessingCost(int thumbnailCount, int resolution) {
+    double countFactor = thumbnailCount / 600.0;
+    double resFactor = 0.937 + 0.063 * Math.pow(resolution / 120.0, 2);
+    double spriteFactor = 25.0 / (spriteSize().rows() * spriteSize().cols());
+    return 105 * countFactor * resFactor * spriteFactor;
+  }
 }

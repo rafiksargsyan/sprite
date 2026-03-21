@@ -369,7 +369,7 @@ export function Jobs() {
                 <TableCell>Created</TableCell>
                 <TableCell>Started</TableCell>
                 <TableCell>Finished</TableCell>
-                <TableCell>Extraction Cost</TableCell>
+                <TableCell>Cost</TableCell>
                 <TableCell>Download</TableCell>
                 <TableCell>Preview</TableCell>
               </TableRow>
@@ -410,7 +410,7 @@ export function Jobs() {
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">
-                      {job.extractionCost != null ? Math.round(job.extractionCost) : '—'}
+                      {job.cost != null ? Math.round(job.cost) : '—'}
                     </Typography>
                   </TableCell>
                   <TableCell>

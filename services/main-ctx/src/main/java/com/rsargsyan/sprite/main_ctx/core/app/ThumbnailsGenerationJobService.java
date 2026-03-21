@@ -12,6 +12,7 @@ import com.rsargsyan.sprite.main_ctx.core.exception.*;
 import com.rsargsyan.sprite.main_ctx.core.ports.repository.AccountRepository;
 import com.rsargsyan.sprite.main_ctx.core.ports.repository.JobSpecRepository;
 import com.rsargsyan.sprite.main_ctx.core.ports.repository.ThumbnailsGenerationJobRepository;
+import io.hypersistence.tsid.TSID;
 import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -214,21 +215,22 @@ public class ThumbnailsGenerationJobService {
 
   void process(Long jobId) {
     ScheduledFuture<?> heartbeat = activeHeartbeats.get(jobId);
-
-    var job = transactionTemplate.execute(status -> {
-      var j = thumbnailsGenerationJobRepository.findById(jobId)
-          .orElseThrow(ResourceNotFoundException::new);
-      j.run();
-      thumbnailsGenerationJobRepository.save(j);
-      return j;
-    });
-    if (job == null) return;
-
-    String strId = job.getStrId();
-    Path jobFolder = Paths.get(config.baseOutputFolder).resolve(strId);
-    Path zipFile = Paths.get(config.baseOutputFolder).resolve(strId + ".zip");
+    Path jobFolder = null;
+    Path zipFile = null;
+    final String strId = TSID.from(jobId).toString();
 
     try {
+      var job = transactionTemplate.execute(status -> {
+        var j = thumbnailsGenerationJobRepository.findById(jobId)
+            .orElseThrow(ResourceNotFoundException::new);
+        j.run();
+        thumbnailsGenerationJobRepository.save(j);
+        return j;
+      });
+      if (job == null) return;
+
+      jobFolder = Paths.get(config.baseOutputFolder).resolve(strId);
+      zipFile = Paths.get(config.baseOutputFolder).resolve(strId + ".zip");
       List<ThumbnailConfig> configs = job.getJobSpec().configs();
       String videoUrl = job.getVideoURL().toString();
 
@@ -239,14 +241,18 @@ public class ThumbnailsGenerationJobService {
       log.info("[{}] Probe: {}s (codec={}, inputRes={}, duration={}s)", strId, elapsed(probeT),
           probe.codec(), probe.inputRes(), probe.durationSec());
 
-      double totalExtractionCost = ExtractionCostCalculator.calculate(
-          probe.durationSec(), probe.codec(), probe.inputRes());
+      double extractionCost = ExtractionCostCalculator.calculate(
+          probe.durationSec(), probe.codec(), probe.inputRes()) * configs.size();
+      double postProcessingCost = configs.stream()
+          .mapToDouble(cfg -> cfg.postProcessingCost(probe.durationSec() / cfg.interval(), cfg.resolution()))
+          .sum();
+      double totalCost = extractionCost + postProcessingCost;
       transactionTemplate.executeWithoutResult(s -> {
         ThumbnailsGenerationJob j = thumbnailsGenerationJobRepository.findById(job.getId()).orElseThrow();
-        j.recordExtractionCost(totalExtractionCost);
+        j.recordCost(totalCost);
         thumbnailsGenerationJobRepository.save(j);
       });
-      log.info("[{}] Extraction cost: {}", strId, totalExtractionCost);
+      log.info("[{}] Cost: {} (extraction={}, postProcessing={})", strId, totalCost, extractionCost, postProcessingCost);
 
       String videoPath;
       if (hasSufficientDiskSpace()) {
@@ -324,8 +330,8 @@ public class ThumbnailsGenerationJobService {
     } finally {
       activeHeartbeats.remove(jobId);
       if (heartbeat != null) heartbeat.cancel(false);
-      deleteRecursively(jobFolder);
-      try { Files.deleteIfExists(zipFile); } catch (IOException ignored) {}
+      if (jobFolder != null) deleteRecursively(jobFolder);
+      try { if (zipFile != null) Files.deleteIfExists(zipFile); } catch (IOException ignored) {}
     }
   }
 
@@ -363,20 +369,21 @@ public class ThumbnailsGenerationJobService {
   }
 
   private static Path downloadVideo(String videoUrl, Path jobFolder) {
-    Path videoFile = jobFolder.resolve("video");
-    var client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
-    var request = HttpRequest.newBuilder().uri(URI.create(videoUrl)).build();
-    try {
-      var response = client.send(request, HttpResponse.BodyHandlers.ofFile(videoFile));
-      if (response.statusCode() >= 400) {
-        throw new VideoNotAccessibleException("Video returned HTTP " + response.statusCode() + ": " + videoUrl);
-      }
-    } catch (VideoNotAccessibleException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new VideoNotAccessibleException("Failed to download video: " + videoUrl, e);
-    }
-    return videoFile;
+    return Path.of("/Users/rsargsyan/Workspace/tmp/BigBuckBunny.mp4");
+//    Path videoFile = jobFolder.resolve("video");
+//    var client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
+//    var request = HttpRequest.newBuilder().uri(URI.create(videoUrl)).build();
+//    try {
+//      var response = client.send(request, HttpResponse.BodyHandlers.ofFile(videoFile));
+//      if (response.statusCode() >= 400) {
+//        throw new VideoNotAccessibleException("Video returned HTTP " + response.statusCode() + ": " + videoUrl);
+//      }
+//    } catch (VideoNotAccessibleException e) {
+//      throw e;
+//    } catch (Exception e) {
+//      throw new VideoNotAccessibleException("Failed to download video: " + videoUrl, e);
+//    }
+//    return videoFile;
   }
 
   private void awsS3Upload(Path source, String s3Key, boolean recursive) throws Exception {

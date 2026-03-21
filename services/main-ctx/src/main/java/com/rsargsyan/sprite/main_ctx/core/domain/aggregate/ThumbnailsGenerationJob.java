@@ -51,7 +51,7 @@ public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
   @Column(columnDefinition = "jsonb")
   private List<ConfigProcessingStats> processingStats;
 
-  private Double extractionCost;
+  private Double cost;
 
   @SuppressWarnings("unused")
   ThumbnailsGenerationJob() {}
@@ -112,8 +112,8 @@ public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
     this.processingStats = stats;
   }
 
-  public void recordExtractionCost(double cost) {
-    this.extractionCost = cost;
+  public void recordCost(double cost) {
+    this.cost = cost;
   }
 
   public void succeed() {

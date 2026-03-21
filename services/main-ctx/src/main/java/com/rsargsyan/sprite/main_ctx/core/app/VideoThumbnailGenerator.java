@@ -30,7 +30,7 @@ public class VideoThumbnailGenerator {
 
     Files.createDirectories(configFolder);
 
-    int resolution = config instanceof BlurhashThumbnailConfig ? 32 : config.resolution();
+    int resolution = config.resolution();
     int jpegQuality = config instanceof BlurhashThumbnailConfig ? 8 : 2;
 
     long extractionStart = System.currentTimeMillis();
@@ -46,7 +46,9 @@ public class VideoThumbnailGenerator {
       int spriteR = config.spriteSize().rows();
       int spriteC = config.spriteSize().cols();
       int spriteS = spriteR * spriteC;
-      generateSprites(configFolder, spriteC, spriteR, spriteS, config);
+
+      generateSprites(configFolder, spriteC, spriteR, spriteS, thumbnailsCount, config);
+
       generateWebVtt(configFolder, thumbnailsCount, spriteS, spriteC, dim.width, dim.height,
           config.interval(), config.format());
     }
@@ -148,22 +150,25 @@ public class VideoThumbnailGenerator {
   private static Dimension resolveImageSize(Path imagePath) throws Exception {
 
     ProcessBuilder pb = new ProcessBuilder(
-        "identify",
-        "-format",
-        "%w %h",
+        "ffprobe", "-v", "error",
+        "-select_streams", "v:0",
+        "-show_entries", "stream=width,height",
+        "-of", "csv=p=0",
         imagePath.toString()
     );
 
     Process process = pb.start();
-
     String output = new String(process.getInputStream().readAllBytes());
-    String[] parts = output.trim().split(" ");
+    int exitCode = process.waitFor();
 
+    if (exitCode != 0) throw new RuntimeException("ffprobe failed to resolve image size");
+
+    String[] parts = output.trim().split(",");
     if (parts.length != 2) throw new RuntimeException("Failed to resolve image size");
 
     return new Dimension(
-        Integer.parseInt(parts[0]),
-        Integer.parseInt(parts[1])
+        Integer.parseInt(parts[0].trim()),
+        Integer.parseInt(parts[1].trim())
     );
   }
 
@@ -176,72 +181,41 @@ public class VideoThumbnailGenerator {
     }
   }
 
-  private static void generateSprites(Path dir, int spriteC, int spriteR, int spriteS, ThumbnailConfig config) throws Exception {
+  private static void generateSprites(Path dir, int spriteC, int spriteR, int spriteS,
+                                      int thumbnailCount, ThumbnailConfig config) throws Exception {
 
-    List<Path> thumbnails;
-    try (Stream<Path> stream = Files.list(dir)) {
-      thumbnails = stream
-          .filter(p -> p.getFileName().toString().startsWith("thumbnail-"))
-          .sorted()
-          .toList();
-    }
+    int spriteCount = (thumbnailCount + spriteS - 1) / spriteS;
 
-    int spriteCount = (thumbnails.size() + spriteS - 1) / spriteS;
-
-    // Step 1: tile thumbnails into sprite-N.jpg using +append (rows) then -append (columns)
     for (int s = 0; s < spriteCount; s++) {
-      List<Path> batch = thumbnails.subList(s * spriteS, Math.min((s + 1) * spriteS, thumbnails.size()));
-      List<Path> rowFiles = new ArrayList<>();
+      int startNumber = s * spriteS + 1;
+      int batchSize = Math.min(spriteS, thumbnailCount - s * spriteS);
+      Path spriteFile = dir.resolve("sprite-" + s + "." + config.format());
 
-      for (int r = 0; r < spriteR; r++) {
-        int from = r * spriteC;
-        if (from >= batch.size()) break;
-        List<Path> rowThumbs = batch.subList(from, Math.min(from + spriteC, batch.size()));
+      List<String> cmd = new ArrayList<>(List.of(
+          "ffmpeg", "-y",
+          "-start_number", String.valueOf(startNumber),
+          "-i", "thumbnail-%06d.jpg",
+          "-vf", "trim=start_frame=0:end_frame=" + batchSize + ",tile=" + spriteC + "x" + spriteR,
+          "-frames:v", "1"
+      ));
 
-        Path rowFile = dir.resolve("row-" + s + "-" + r + ".jpg");
-        List<String> cmd = new ArrayList<>(List.of("magick"));
-        rowThumbs.forEach(p -> cmd.add(p.toString()));
-        cmd.add("+append");
-        cmd.add(rowFile.toString());
-        runChecked(cmd, dir, "magick +append");
-        rowFiles.add(rowFile);
-      }
-
-      Path spriteFile = dir.resolve("sprite-" + s + ".jpg");
-      if (rowFiles.size() == 1) {
-        Files.move(rowFiles.get(0), spriteFile, StandardCopyOption.REPLACE_EXISTING);
+      if (config instanceof WebpThumbnailConfig webp) {
+        cmd.addAll(List.of("-c:v", "libwebp"));
+        cmd.addAll(List.of("-quality", String.valueOf(webp.quality())));
+        cmd.addAll(List.of("-lossless", "0"));
+        cmd.addAll(List.of("-compression_level", String.valueOf(webp.method())));
+      } else if (config instanceof AvifThumbnailConfig avif) {
+        int crf = (100 - avif.quality()) * 63 / 100;
+        cmd.addAll(List.of("-c:v", "libaom-av1"));
+        cmd.addAll(List.of("-crf", String.valueOf(crf)));
+        cmd.addAll(List.of("-cpu-used", "6"));
       } else {
-        List<String> cmd = new ArrayList<>(List.of("magick"));
-        rowFiles.forEach(p -> cmd.add(p.toString()));
-        cmd.add("-append");
-        cmd.add(spriteFile.toString());
-        runChecked(cmd, dir, "magick -append");
-        for (Path row : rowFiles) Files.deleteIfExists(row);
+        int q = Math.max(1, Math.round((100 - config.quality()) * 31.0f / 100));
+        cmd.addAll(List.of("-q:v", String.valueOf(q)));
       }
-    }
 
-    // Step 2: convert each sprite-N.jpg to the target format
-    StringBuilder convertFlags = new StringBuilder();
-    convertFlags.append(String.format("-quality %d ", config.quality()));
-    if (config instanceof WebpThumbnailConfig webp) {
-      convertFlags.append(String.format("-define webp:preset=%s ", webp.preset()));
-      if (webp.lossless()) convertFlags.append("-define webp:lossless=true ");
-      convertFlags.append(String.format("-define webp:method=%d ", webp.method()));
-    } else if (config instanceof AvifThumbnailConfig avif) {
-      convertFlags.append(String.format("-define avif:speed=%d ", avif.speed()));
-    }
-
-    if (!config.format().equals("jpg")) {
-      String convertCmd = String.format(
-          "for f in sprite-*.jpg; do magick \"$f\" %s\"${f%%.jpg}.%s\" && rm \"$f\"; done",
-          convertFlags, config.format());
-      runChecked(convertCmd, dir, "magick convert");
-    } else if (convertFlags.toString().isBlank()) {
-      // jpg with default quality — already done, no conversion needed
-    } else {
-      String convertCmd = String.format(
-          "for f in sprite-*.jpg; do magick \"$f\" %s\"$f\"; done", convertFlags);
-      runChecked(convertCmd, dir, "magick convert");
+      cmd.addAll(List.of("-update", "1", spriteFile.toString()));
+      runChecked(cmd, dir, "ffmpeg sprite");
     }
   }
 
@@ -276,7 +250,7 @@ public class VideoThumbnailGenerator {
           .append("\n\n");
     }
 
-    Files.writeString(vttFile, vtt.toString(), StandardOpenOption.CREATE_NEW);
+    Files.writeString(vttFile, vtt.toString(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
   }
 
   private static void deleteThumbnails(Path dir) throws IOException {
@@ -328,7 +302,7 @@ public class VideoThumbnailGenerator {
       ));
     }
 
-    Files.writeString(vttFile, vtt.toString(), StandardOpenOption.CREATE_NEW);
+    Files.writeString(vttFile, vtt.toString(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
   }
 
   private static String vttTimestamp(int seconds) {

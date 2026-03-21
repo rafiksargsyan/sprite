@@ -33,11 +33,11 @@ public class JobSpecDTO {
       );
     } else if (config instanceof WebpThumbnailConfig c) {
       return new WebpThumbnailConfigResponse(
-          c.resolution(), new SpriteSizeResponse(c.spriteSize().rows(), c.spriteSize().cols()), c.quality(), c.method(), c.lossless(), c.interval(), c.preset(), c.folderName()
+          c.resolution(), new SpriteSizeResponse(c.spriteSize().rows(), c.spriteSize().cols()), c.quality(), c.method(), c.interval(), c.folderName()
       );
     } else if (config instanceof AvifThumbnailConfig c) {
       return new AvifThumbnailConfigResponse(
-          c.resolution(), new SpriteSizeResponse(c.spriteSize().rows(), c.spriteSize().cols()), c.quality(), c.interval(), c.speed(), c.folderName()
+          c.resolution(), new SpriteSizeResponse(c.spriteSize().rows(), c.spriteSize().cols()), c.quality(), c.interval(), c.folderName()
       );
     } else if (config instanceof BlurhashThumbnailConfig c) {
       return new BlurhashThumbnailConfigResponse(c.interval(), c.componentsX(), c.componentsY(), c.folderName());

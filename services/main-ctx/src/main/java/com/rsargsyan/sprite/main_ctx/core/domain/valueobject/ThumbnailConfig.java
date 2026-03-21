@@ -18,4 +18,6 @@ public sealed interface ThumbnailConfig permits JpgThumbnailConfig, WebpThumbnai
   int quality();
   int interval();
   String folderName();
+
+  double postProcessingCost(int thumbnailCount, int resolution);
 }

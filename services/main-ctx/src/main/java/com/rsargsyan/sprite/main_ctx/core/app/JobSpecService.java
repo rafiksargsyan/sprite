@@ -64,11 +64,11 @@ public class JobSpecService {
     if (req instanceof JpgThumbnailConfigRequest r) {
       return new JpgThumbnailConfig(r.resolution(), toSpriteSize(r.spriteSize()), r.quality(), r.interval(), r.folderName());
     } else if (req instanceof WebpThumbnailConfigRequest r) {
-      return new WebpThumbnailConfig(r.resolution(), toSpriteSize(r.spriteSize()), r.quality(), r.method(), r.lossless(), r.interval(), r.preset(), r.folderName());
+      return new WebpThumbnailConfig(r.resolution(), toSpriteSize(r.spriteSize()), r.quality(), r.method(), r.interval(), r.folderName());
     } else if (req instanceof AvifThumbnailConfigRequest r) {
-      return new AvifThumbnailConfig(r.resolution(), toSpriteSize(r.spriteSize()), r.quality(), r.interval(), r.speed(), r.folderName());
+      return new AvifThumbnailConfig(r.resolution(), toSpriteSize(r.spriteSize()), r.quality(), r.interval(), r.folderName());
     } else if (req instanceof BlurhashThumbnailConfigRequest r) {
-      return new BlurhashThumbnailConfig(32, r.interval(), r.componentsX(), r.componentsY(), r.folderName());
+      return new BlurhashThumbnailConfig(r.interval(), r.componentsX(), r.componentsY(), r.folderName());
     }
     throw new IllegalStateException("Unknown config type: " + req.getClass());
   }
