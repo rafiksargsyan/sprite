@@ -84,6 +84,9 @@ public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
       throw new IllegalJobStateTransitionException(this.status, Status.RECEIVED);
     }
     this.status = Status.RECEIVED;
+    if (this.lastHeartbeatAt == null) {
+      this.lastHeartbeatAt = Instant.now();
+    }
     touch();
   }
 

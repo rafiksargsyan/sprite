@@ -35,6 +35,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6'
 	implementation 'io.trbl:blurhash:1.0.0'
+	implementation 'org.apache.httpcomponents.client5:httpclient5:5.4.1'
 	implementation 'com.github.kagkarlsson:db-scheduler-spring-boot-starter:15.0.0'
 }
 
