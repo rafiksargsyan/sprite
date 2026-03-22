@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sprite — Video Thumbnail Sprite Sheets as a Service</title>
+  <meta name="description" content="Submit a video URL, get back sprite sheets and WebVTT files ready for your video player. Supports WebP, AVIF, JPG, and Blurhash." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- NAV -->
+  <header class="nav">
+    <div class="container nav-inner">
+      <a href="/" class="logo">sprite</a>
+      <nav class="nav-links">
+        <a href="#how-it-works">How it works</a>
+        <a href="#features">Features</a>
+        <a href="#pricing">Pricing</a>
+        <a href="https://app.sprite.dev" class="btn btn-outline">Sign in</a>
+        <a href="https://app.sprite.dev" class="btn btn-primary">Get started</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="container hero-inner">
+      <div class="badge">Now in beta</div>
+      <h1>Video thumbnail sprites,<br />on demand.</h1>
+      <p class="hero-sub">
+        Submit a video URL. Get back sprite sheets and WebVTT files
+        ready to drop into any video player. No infrastructure, no FFmpeg wrangling.
+      </p>
+      <div class="hero-actions">
+        <a href="https://app.sprite.dev" class="btn btn-primary btn-lg">Start for free</a>
+        <a href="#how-it-works" class="btn btn-ghost btn-lg">See how it works →</a>
+      </div>
+      <div class="hero-code">
+        <div class="code-label">REST API</div>
+        <pre><code><span class="c-method">POST</span> /thumbnails-generation-job
+<span class="c-key">{</span>
+  <span class="c-prop">"videoURL"</span>: <span class="c-str">"https://example.com/video.mp4"</span>,
+  <span class="c-prop">"jobSpecId"</span>: <span class="c-str">"your-spec-id"</span>
+<span class="c-key">}</span></code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="section" id="how-it-works">
+    <div class="container">
+      <h2 class="section-title">How it works</h2>
+      <p class="section-sub">Three steps from video URL to ready-to-use sprites.</p>
+      <div class="steps">
+        <div class="step">
+          <div class="step-number">1</div>
+          <h3>Define a job spec</h3>
+          <p>Configure your output formats (WebP, AVIF, JPG, Blurhash), resolutions, sprite grid size, and intervals — once, reuse forever.</p>
+        </div>
+        <div class="step-arrow">→</div>
+        <div class="step">
+          <div class="step-number">2</div>
+          <h3>Submit a job</h3>
+          <p>POST a video URL with your spec ID. Sprite fetches the video, runs FFmpeg, and assembles the sprite sheets asynchronously.</p>
+        </div>
+        <div class="step-arrow">→</div>
+        <div class="step">
+          <div class="step-number">3</div>
+          <h3>Download &amp; use</h3>
+          <p>Grab the ZIP with sprite images and WebVTT files. Drop them into your player's thumbnail preview configuration and you're done.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="section section-alt" id="features">
+    <div class="container">
+      <h2 class="section-title">Everything you need</h2>
+      <p class="section-sub">Built for developers who don't want to run video infrastructure.</p>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">🎞️</div>
+          <h3>Multiple formats</h3>
+          <p>WebP, AVIF, JPG, and Blurhash — generate all of them in a single job from one video URL.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <h3>Async processing</h3>
+          <p>Jobs are queued and processed asynchronously with automatic retries. No request timeouts, no babysitting.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔑</div>
+          <h3>API key access</h3>
+          <p>Integrate directly from your backend using API keys. No OAuth flow required for server-to-server calls.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📐</div>
+          <h3>Flexible sprite grids</h3>
+          <p>Configure rows, columns, resolution, and interval per format. Fine-tune the trade-off between quality and file size.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">👁️</div>
+          <h3>Built-in preview</h3>
+          <p>Scrub through generated thumbnails directly in the dashboard before downloading or deploying.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📦</div>
+          <h3>WebVTT included</h3>
+          <p>Every job produces a WebVTT file alongside the sprites. Compatible with Video.js, Plyr, Shaka Player, and more.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRICING -->
+  <section class="section" id="pricing">
+    <div class="container">
+      <h2 class="section-title">Simple pricing</h2>
+      <p class="section-sub">Pay for what you use. No monthly minimums during beta.</p>
+      <div class="pricing-grid">
+        <div class="pricing-card">
+          <div class="pricing-tier">Free</div>
+          <div class="pricing-price">$0<span>/mo</span></div>
+          <ul class="pricing-features">
+            <li>✓ 10 jobs / month</li>
+            <li>✓ All output formats</li>
+            <li>✓ Dashboard &amp; preview</li>
+            <li>✓ REST API access</li>
+          </ul>
+          <a href="https://app.sprite.dev" class="btn btn-outline btn-block">Get started</a>
+        </div>
+        <div class="pricing-card pricing-card-featured">
+          <div class="pricing-badge">Most popular</div>
+          <div class="pricing-tier">Pro</div>
+          <div class="pricing-price">$19<span>/mo</span></div>
+          <ul class="pricing-features">
+            <li>✓ Unlimited jobs</li>
+            <li>✓ All output formats</li>
+            <li>✓ Priority processing</li>
+            <li>✓ REST API access</li>
+            <li>✓ Email support</li>
+          </ul>
+          <a href="https://app.sprite.dev" class="btn btn-primary btn-block">Start free trial</a>
+        </div>
+        <div class="pricing-card">
+          <div class="pricing-tier">Enterprise</div>
+          <div class="pricing-price">Custom</div>
+          <ul class="pricing-features">
+            <li>✓ Volume discounts</li>
+            <li>✓ Dedicated processing</li>
+            <li>✓ SLA guarantee</li>
+            <li>✓ Custom integrations</li>
+          </ul>
+          <a href="mailto:hello@sprite.dev" class="btn btn-outline btn-block">Contact us</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section">
+    <div class="container cta-inner">
+      <h2>Ready to add thumbnail previews?</h2>
+      <p>Join the beta — free to start, no credit card required.</p>
+      <a href="https://app.sprite.dev" class="btn btn-primary btn-lg">Create your free account</a>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container footer-inner">
+      <span class="logo">sprite</span>
+      <nav class="footer-links">
+        <a href="https://app.sprite.dev">App</a>
+        <a href="https://github.com/rsargsyan/sprite">GitHub</a>
+        <a href="mailto:hello@sprite.dev">Contact</a>
+      </nav>
+      <span class="footer-copy">© 2025 Sprite</span>
+    </div>
+  </footer>
+
+</body>
+</html>
