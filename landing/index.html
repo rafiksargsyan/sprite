@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sprite — Video Thumbnail Sprite Sheets as a Service</title>
-  <meta name="description" content="Submit a video URL, get back sprite sheets and WebVTT files ready for your video player. Supports WebP, AVIF, JPG, and Blurhash." />
+  <title>Sprite — Video Thumbnail Sprite Sheets</title>
+  <meta name="description" content="An open source service that generates video thumbnail sprite sheets and WebVTT files from a video URL. Built with Spring Boot, React, FFmpeg, and Backblaze B2." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -17,11 +17,14 @@
     <div class="container nav-inner">
       <a href="/" class="logo">sprite</a>
       <nav class="nav-links">
+        <a href="#demo">Demo</a>
         <a href="#how-it-works">How it works</a>
-        <a href="#features">Features</a>
-        <a href="#pricing">Pricing</a>
-        <a href="https://app.sprite.dev" class="btn btn-outline">Sign in</a>
-        <a href="https://app.sprite.dev" class="btn btn-primary">Get started</a>
+        <a href="#stack">Stack</a>
+        <a href="#self-host">Self-host</a>
+        <a href="https://github.com/rsargsyan/sprite" class="btn btn-outline" target="_blank" rel="noopener noreferrer">
+          <svg class="icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          GitHub
+        </a>
       </nav>
     </div>
   </header>
@@ -29,23 +32,62 @@
   <!-- HERO -->
   <section class="hero">
     <div class="container hero-inner">
-      <div class="badge">Now in beta</div>
-      <h1>Video thumbnail sprites,<br />on demand.</h1>
+      <a href="https://github.com/rsargsyan/sprite" class="github-badge" target="_blank" rel="noopener noreferrer">
+        <svg class="icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        Open source on GitHub
+      </a>
+      <h1>Generate video thumbnail<br />sprite sheets from a URL.</h1>
       <p class="hero-sub">
-        Submit a video URL. Get back sprite sheets and WebVTT files
-        ready to drop into any video player. No infrastructure, no FFmpeg wrangling.
+        Sprite is a self-hostable service that takes a video URL and produces
+        sprite sheets + WebVTT files ready for any video player's thumbnail preview.
+        No FFmpeg setup on your end.
       </p>
       <div class="hero-actions">
-        <a href="https://app.sprite.dev" class="btn btn-primary btn-lg">Start for free</a>
-        <a href="#how-it-works" class="btn btn-ghost btn-lg">See how it works →</a>
+        <a href="https://app.sprite.dev" class="btn btn-primary btn-lg">Try the live demo</a>
+        <a href="https://github.com/rsargsyan/sprite" class="btn btn-outline btn-lg" target="_blank" rel="noopener noreferrer">View source</a>
       </div>
-      <div class="hero-code">
-        <div class="code-label">REST API</div>
-        <pre><code><span class="c-method">POST</span> /thumbnails-generation-job
-<span class="c-key">{</span>
-  <span class="c-prop">"videoURL"</span>: <span class="c-str">"https://example.com/video.mp4"</span>,
-  <span class="c-prop">"jobSpecId"</span>: <span class="c-str">"your-spec-id"</span>
-<span class="c-key">}</span></code></pre>
+    </div>
+  </section>
+
+  <!-- DEMO VIDEO -->
+  <section class="section" id="demo">
+    <div class="container">
+      <h2 class="section-title">See it in action</h2>
+      <p class="section-sub">Submit a URL, wait for processing, scrub through the result.</p>
+      <div class="demo-video-wrap">
+        <video
+          class="demo-video"
+          src="assets/demo.mp4"
+          autoplay
+          loop
+          muted
+          playsinline
+          poster="assets/demo-poster.jpg"
+        >
+          Your browser doesn't support HTML5 video.
+        </video>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHY -->
+  <section class="section section-alt" id="why">
+    <div class="container why-inner">
+      <div class="why-text">
+        <h2>Why I built this</h2>
+        <p>
+          I was working on a video platform and needed thumbnail previews — the kind
+          where you hover over a progress bar and see a frame from that point in the video.
+          Every solution I found either required running FFmpeg myself on each upload,
+          or paying for a closed-source service with no visibility into what it was doing.
+        </p>
+        <p>
+          Sprite is what I wished existed: a clean REST API, async job processing,
+          multiple output formats, and a dashboard for when you just want to click around.
+          It's fully open source so you can read every line, self-host it, or just use
+          the hosted version.
+        </p>
+        <p class="why-sig">— Ruben</p>
       </div>
     </div>
   </section>
@@ -54,120 +96,145 @@
   <section class="section" id="how-it-works">
     <div class="container">
       <h2 class="section-title">How it works</h2>
-      <p class="section-sub">Three steps from video URL to ready-to-use sprites.</p>
+      <p class="section-sub">From video URL to ready-to-use sprites in three steps.</p>
       <div class="steps">
         <div class="step">
           <div class="step-number">1</div>
           <h3>Define a job spec</h3>
-          <p>Configure your output formats (WebP, AVIF, JPG, Blurhash), resolutions, sprite grid size, and intervals — once, reuse forever.</p>
+          <p>Configure output formats (WebP, AVIF, JPG, Blurhash), resolution, sprite grid, and interval once. Reuse it across any number of jobs.</p>
         </div>
         <div class="step-arrow">→</div>
         <div class="step">
           <div class="step-number">2</div>
           <h3>Submit a job</h3>
-          <p>POST a video URL with your spec ID. Sprite fetches the video, runs FFmpeg, and assembles the sprite sheets asynchronously.</p>
+          <p>POST a video URL with your spec ID via the REST API or the dashboard. Sprite fetches the video, runs FFmpeg, and assembles the sprite sheets asynchronously.</p>
         </div>
         <div class="step-arrow">→</div>
         <div class="step">
           <div class="step-number">3</div>
           <h3>Download &amp; use</h3>
-          <p>Grab the ZIP with sprite images and WebVTT files. Drop them into your player's thumbnail preview configuration and you're done.</p>
+          <p>Grab the ZIP — sprite images and a WebVTT file ready for Video.js, Plyr, Shaka Player, or anything that supports the WebVTT thumbnail spec.</p>
         </div>
+      </div>
+
+      <div class="hero-code" style="max-width: 560px; margin: 56px auto 0;">
+        <div class="code-label">REST API example</div>
+        <pre><code><span class="c-method">POST</span> /thumbnails-generation-job
+<span class="c-comment">// Headers: Authorization + X-ACCOUNT-ID</span>
+<span class="c-key">{</span>
+  <span class="c-prop">"videoURL"</span>: <span class="c-str">"https://example.com/video.mp4"</span>,
+  <span class="c-prop">"jobSpecId"</span>: <span class="c-str">"your-spec-id"</span>
+<span class="c-key">}</span></code></pre>
       </div>
     </div>
   </section>
 
   <!-- FEATURES -->
-  <section class="section section-alt" id="features">
+  <section class="section section-alt">
     <div class="container">
-      <h2 class="section-title">Everything you need</h2>
-      <p class="section-sub">Built for developers who don't want to run video infrastructure.</p>
+      <h2 class="section-title">What's included</h2>
+      <p class="section-sub">Everything you need, nothing you don't.</p>
       <div class="features-grid">
         <div class="feature-card">
           <div class="feature-icon">🎞️</div>
           <h3>Multiple formats</h3>
-          <p>WebP, AVIF, JPG, and Blurhash — generate all of them in a single job from one video URL.</p>
+          <p>WebP, AVIF, JPG, and Blurhash — generate all of them from a single job.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">⚡</div>
           <h3>Async processing</h3>
-          <p>Jobs are queued and processed asynchronously with automatic retries. No request timeouts, no babysitting.</p>
+          <p>Jobs are queued via RabbitMQ and processed with automatic retries. Fire and forget.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">🔑</div>
-          <h3>API key access</h3>
-          <p>Integrate directly from your backend using API keys. No OAuth flow required for server-to-server calls.</p>
+          <h3>API key auth</h3>
+          <p>Integrate from your backend with API keys. OAuth2 (Firebase JWT) also supported.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">📐</div>
-          <h3>Flexible sprite grids</h3>
-          <p>Configure rows, columns, resolution, and interval per format. Fine-tune the trade-off between quality and file size.</p>
+          <h3>Configurable grids</h3>
+          <p>Set rows, columns, resolution, and interval per format. Balance quality vs. file size.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">👁️</div>
-          <h3>Built-in preview</h3>
-          <p>Scrub through generated thumbnails directly in the dashboard before downloading or deploying.</p>
+          <h3>Preview in browser</h3>
+          <p>Scrub through generated thumbnails directly in the dashboard before downloading.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">📦</div>
           <h3>WebVTT included</h3>
-          <p>Every job produces a WebVTT file alongside the sprites. Compatible with Video.js, Plyr, Shaka Player, and more.</p>
+          <p>Sprite images and a matching WebVTT file in every download ZIP, ready for any player.</p>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- PRICING -->
-  <section class="section" id="pricing">
+  <!-- STACK -->
+  <section class="section" id="stack">
     <div class="container">
-      <h2 class="section-title">Simple pricing</h2>
-      <p class="section-sub">Pay for what you use. No monthly minimums during beta.</p>
-      <div class="pricing-grid">
-        <div class="pricing-card">
-          <div class="pricing-tier">Free</div>
-          <div class="pricing-price">$0<span>/mo</span></div>
-          <ul class="pricing-features">
-            <li>✓ 10 jobs / month</li>
-            <li>✓ All output formats</li>
-            <li>✓ Dashboard &amp; preview</li>
-            <li>✓ REST API access</li>
-          </ul>
-          <a href="https://app.sprite.dev" class="btn btn-outline btn-block">Get started</a>
+      <h2 class="section-title">Built with</h2>
+      <p class="section-sub">A straightforward stack — nothing exotic.</p>
+      <div class="stack-grid">
+        <div class="stack-item">
+          <div class="stack-name">Spring Boot 3</div>
+          <div class="stack-desc">Java 21 backend, hexagonal architecture</div>
         </div>
-        <div class="pricing-card pricing-card-featured">
-          <div class="pricing-badge">Most popular</div>
-          <div class="pricing-tier">Pro</div>
-          <div class="pricing-price">$19<span>/mo</span></div>
-          <ul class="pricing-features">
-            <li>✓ Unlimited jobs</li>
-            <li>✓ All output formats</li>
-            <li>✓ Priority processing</li>
-            <li>✓ REST API access</li>
-            <li>✓ Email support</li>
-          </ul>
-          <a href="https://app.sprite.dev" class="btn btn-primary btn-block">Start free trial</a>
+        <div class="stack-item">
+          <div class="stack-name">React + TypeScript</div>
+          <div class="stack-desc">Vite, Material UI, Firebase Auth</div>
         </div>
-        <div class="pricing-card">
-          <div class="pricing-tier">Enterprise</div>
-          <div class="pricing-price">Custom</div>
-          <ul class="pricing-features">
-            <li>✓ Volume discounts</li>
-            <li>✓ Dedicated processing</li>
-            <li>✓ SLA guarantee</li>
-            <li>✓ Custom integrations</li>
-          </ul>
-          <a href="mailto:hello@sprite.dev" class="btn btn-outline btn-block">Contact us</a>
+        <div class="stack-item">
+          <div class="stack-name">FFmpeg</div>
+          <div class="stack-desc">Frame extraction and sprite assembly</div>
+        </div>
+        <div class="stack-item">
+          <div class="stack-name">RabbitMQ</div>
+          <div class="stack-desc">Async job queue with manual ACK</div>
+        </div>
+        <div class="stack-item">
+          <div class="stack-name">PostgreSQL</div>
+          <div class="stack-desc">Primary datastore, job state tracking</div>
+        </div>
+        <div class="stack-item">
+          <div class="stack-name">Backblaze B2</div>
+          <div class="stack-desc">S3-compatible storage for sprites</div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- CTA -->
-  <section class="cta-section">
-    <div class="container cta-inner">
-      <h2>Ready to add thumbnail previews?</h2>
-      <p>Join the beta — free to start, no credit card required.</p>
-      <a href="https://app.sprite.dev" class="btn btn-primary btn-lg">Create your free account</a>
+  <!-- SELF HOST -->
+  <section class="section section-alt" id="self-host">
+    <div class="container self-host-inner">
+      <div class="self-host-text">
+        <h2>Self-host it</h2>
+        <p>
+          Sprite is fully open source. Clone the repo, spin up the dependencies with Docker,
+          point it at your own storage bucket, and you're running your own instance.
+          The backend is a single Spring Boot JAR, the frontend is a static Vite build.
+        </p>
+        <div class="self-host-actions">
+          <a href="https://github.com/rsargsyan/sprite" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
+            <svg class="icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+            View on GitHub
+          </a>
+          <a href="https://app.sprite.dev" class="btn btn-outline">Use the hosted version</a>
+        </div>
+      </div>
+      <div class="self-host-code">
+        <div class="code-label">Quick start</div>
+        <pre><code><span class="c-comment"># clone the repo</span>
+git clone https://github.com/rsargsyan/sprite
+
+<span class="c-comment"># start dependencies</span>
+docker compose up -d postgres rabbitmq
+
+<span class="c-comment"># run the backend</span>
+./gradlew bootRun
+
+<span class="c-comment"># run the frontend</span>
+cd web-ui && pnpm dev</code></pre>
+      </div>
     </div>
   </section>
 
@@ -176,11 +243,11 @@
     <div class="container footer-inner">
       <span class="logo">sprite</span>
       <nav class="footer-links">
-        <a href="https://app.sprite.dev">App</a>
-        <a href="https://github.com/rsargsyan/sprite">GitHub</a>
+        <a href="https://app.sprite.dev">Live app</a>
+        <a href="https://github.com/rsargsyan/sprite" target="_blank" rel="noopener noreferrer">GitHub</a>
         <a href="mailto:hello@sprite.dev">Contact</a>
       </nav>
-      <span class="footer-copy">© 2025 Sprite</span>
+      <span class="footer-copy">Made by <a href="https://github.com/rsargsyan" style="color: var(--text-muted); text-decoration: underline;">Ruben</a></span>
     </div>
   </footer>
 
