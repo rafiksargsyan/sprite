@@ -200,6 +200,8 @@ public class ThumbnailsGenerationJobService {
         job.fail(FailureReason.UNKNOWN);
       } else {
         log.warn("[{}] Retrying stuck job (attempt {})", job.getStrId(), job.getRetryCount() + 1);
+        Process stuckProcess = activeProcesses.remove(job.getId());
+        if (stuckProcess != null) stuckProcess.destroyForcibly();
         job.retry();
         applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobRetryEvent(job.getId()));
       }
@@ -247,6 +249,7 @@ public class ThumbnailsGenerationJobService {
     Path jobFolder = null;
     Path zipFile = null;
     final String strId = TSID.from(jobId).toString();
+    final boolean[] retryScheduled = {false};
 
     try {
       var job = transactionTemplate.execute(status -> {
@@ -258,8 +261,9 @@ public class ThumbnailsGenerationJobService {
       });
       if (job == null) return;
 
-      jobFolder = Paths.get(config.baseOutputFolder).resolve(strId);
-      zipFile = Paths.get(config.baseOutputFolder).resolve(strId + ".zip");
+      String attemptKey = strId + "-" + job.getRetryCount();
+      jobFolder = Paths.get(config.baseOutputFolder).resolve(attemptKey);
+      zipFile = Paths.get(config.baseOutputFolder).resolve(attemptKey + ".zip");
       List<ThumbnailConfig> configs = job.getJobSpec().configs();
       String videoUrl = job.getVideoURL().toString();
 
@@ -353,7 +357,7 @@ public class ThumbnailsGenerationJobService {
               log.warn("[{}] {} failed, scheduling retry (attempt {})", strId, reason, j.getRetryCount() + 1);
               j.retry();
               thumbnailsGenerationJobRepository.save(j);
-              applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobRetryEvent(j.getId()));
+              retryScheduled[0] = true;
             } else {
               j.fail(reason);
               thumbnailsGenerationJobRepository.save(j);
@@ -369,6 +373,9 @@ public class ThumbnailsGenerationJobService {
       if (heartbeat != null) heartbeat.cancel(false);
       if (jobFolder != null) deleteRecursively(jobFolder);
       try { if (zipFile != null) Files.deleteIfExists(zipFile); } catch (IOException ignored) {}
+      if (retryScheduled[0]) {
+        applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobRetryEvent(jobId));
+      }
     }
   }
 
