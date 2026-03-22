@@ -17,6 +17,7 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 public class VideoThumbnailGenerator {
@@ -26,7 +27,8 @@ public class VideoThumbnailGenerator {
   }
 
   public static ConfigProcessingStats run(String videoFilePath, Path configFolder, ThumbnailConfig config,
-                                          Integer streamIndex, int threads, double fps) throws Exception {
+                                          Integer streamIndex, int threads, double fps,
+                                          Consumer<Process> onProcessStart) throws Exception {
 
     Files.createDirectories(configFolder);
 
@@ -34,7 +36,7 @@ public class VideoThumbnailGenerator {
     int jpegQuality = config instanceof BlurhashThumbnailConfig ? 8 : 2;
 
     long extractionStart = System.currentTimeMillis();
-    generateThumbnails(videoFilePath, configFolder, resolution, config.interval(), fps, streamIndex, threads, jpegQuality);
+    generateThumbnails(videoFilePath, configFolder, resolution, config.interval(), fps, streamIndex, threads, jpegQuality, onProcessStart);
     long extractionMs = System.currentTimeMillis() - extractionStart;
 
     long postProcessingStart = System.currentTimeMillis();
@@ -47,7 +49,7 @@ public class VideoThumbnailGenerator {
       int spriteC = config.spriteSize().cols();
       int spriteS = spriteR * spriteC;
 
-      generateSprites(configFolder, spriteC, spriteR, spriteS, thumbnailsCount, config);
+      generateSprites(configFolder, spriteC, spriteR, spriteS, thumbnailsCount, config, onProcessStart);
 
       generateWebVtt(configFolder, thumbnailsCount, spriteS, spriteC, dim.width, dim.height,
           config.interval(), config.format());
@@ -129,7 +131,8 @@ public class VideoThumbnailGenerator {
                                          double fps,
                                          Integer streamIndex,
                                          int threads,
-                                         int jpegQuality) throws Exception {
+                                         int jpegQuality,
+                                         Consumer<Process> onProcessStart) throws Exception {
 
     String mapFlag = streamIndex != null ? "-map 0:" + streamIndex + " " : "";
     boolean isUrl = videoUrl.startsWith("http://") || videoUrl.startsWith("https://") || videoUrl.startsWith("rtmp://") || videoUrl.startsWith("rtsp://");
@@ -144,7 +147,7 @@ public class VideoThumbnailGenerator {
         jpegQuality
     );
 
-    runChecked(cmd, outputDir, "ffmpeg");
+    runChecked(cmd, outputDir, "ffmpeg", onProcessStart);
   }
 
   private static Dimension resolveImageSize(Path imagePath) throws Exception {
@@ -182,7 +185,8 @@ public class VideoThumbnailGenerator {
   }
 
   private static void generateSprites(Path dir, int spriteC, int spriteR, int spriteS,
-                                      int thumbnailCount, ThumbnailConfig config) throws Exception {
+                                      int thumbnailCount, ThumbnailConfig config,
+                                      Consumer<Process> onProcessStart) throws Exception {
 
     int spriteCount = (thumbnailCount + spriteS - 1) / spriteS;
 
@@ -215,7 +219,7 @@ public class VideoThumbnailGenerator {
       }
 
       cmd.addAll(List.of("-update", "1", spriteFile.toString()));
-      runChecked(cmd, dir, "ffmpeg sprite");
+      runChecked(cmd, dir, "ffmpeg sprite", onProcessStart);
     }
   }
 
@@ -317,10 +321,11 @@ public class VideoThumbnailGenerator {
     return String.format("%02d:%02d:%02d.%03d", h, m, s, milli);
   }
 
-  private static void runChecked(List<String> cmd, Path dir, String name) throws Exception {
+  private static void runChecked(List<String> cmd, Path dir, String name, Consumer<Process> onProcessStart) throws Exception {
     ProcessBuilder pb = new ProcessBuilder(cmd).directory(dir.toFile());
     pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
     Process process = pb.start();
+    onProcessStart.accept(process);
     String stderr = new String(process.getErrorStream().readAllBytes());
     int exitCode = process.waitFor();
     if (exitCode != 0) {
@@ -328,10 +333,11 @@ public class VideoThumbnailGenerator {
     }
   }
 
-  private static void runChecked(String cmd, Path dir, String name) throws Exception {
+  private static void runChecked(String cmd, Path dir, String name, Consumer<Process> onProcessStart) throws Exception {
     ProcessBuilder pb = new ProcessBuilder("bash", "-c", cmd).directory(dir.toFile());
     pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
     Process process = pb.start();
+    onProcessStart.accept(process);
     String stderr = new String(process.getErrorStream().readAllBytes());
     int exitCode = process.waitFor();
     if (exitCode != 0) {

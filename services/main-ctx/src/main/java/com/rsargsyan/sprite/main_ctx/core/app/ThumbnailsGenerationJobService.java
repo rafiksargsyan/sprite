@@ -70,6 +70,8 @@ public class ThumbnailsGenerationJobService {
   private final TransactionTemplate transactionTemplate;
   private final ScheduledExecutorService heartbeatScheduler = Executors.newSingleThreadScheduledExecutor();
   private final ConcurrentHashMap<Long, ScheduledFuture<?>> activeHeartbeats = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<Long, Process> activeProcesses = new ConcurrentHashMap<>();
+  private final ScheduledExecutorService cancellationChecker = Executors.newSingleThreadScheduledExecutor();
 
   @Autowired
   public ThumbnailsGenerationJobService(
@@ -90,6 +92,7 @@ public class ThumbnailsGenerationJobService {
     this.s3Presigner = s3Presigner;
     this.config = config;
     this.transactionTemplate = transactionTemplate;
+    this.cancellationChecker.scheduleAtFixedRate(this::checkCancellations, 3, 3, TimeUnit.SECONDS);
   }
 
   public Page<ThumbnailsGenerationJobDTO> findAll(String accountId, int page, int size) {
@@ -159,6 +162,32 @@ public class ThumbnailsGenerationJobService {
 
   public long getMaxFileSizeBytes() {
     return config.maxVideoFileSizeBytes;
+  }
+
+  @Transactional
+  public void cancel(String accountId, String jobId) {
+    var job = thumbnailsGenerationJobRepository
+        .findByAccountIdAndId(Util.validateTSID(accountId), Util.validateTSID(jobId))
+        .orElseThrow(ResourceNotFoundException::new);
+    job.cancel();
+    thumbnailsGenerationJobRepository.save(job);
+  }
+
+  private void checkCancellations() {
+    if (activeProcesses.isEmpty()) return;
+    try {
+      thumbnailsGenerationJobRepository.findAllById(activeProcesses.keySet()).forEach(job -> {
+        if (job.getStatus() == ThumbnailsGenerationJob.Status.CANCELLED) {
+          Process process = activeProcesses.get(job.getId());
+          if (process != null) {
+            log.info("[{}] Cancelling active process", job.getStrId());
+            process.destroyForcibly();
+          }
+        }
+      });
+    } catch (Exception e) {
+      log.warn("Error in cancellation checker: {}", e.getMessage());
+    }
   }
 
   @Transactional
@@ -268,7 +297,7 @@ public class ThumbnailsGenerationJobService {
       for (ThumbnailConfig cfg : configs) {
         Path configFolder = jobFolder.resolve(cfg.folderName());
         try {
-          ConfigProcessingStats stats = VideoThumbnailGenerator.run(videoPath, configFolder, cfg, job.getStreamIndex(), config.ffmpegThreads, probe.fps());
+          ConfigProcessingStats stats = VideoThumbnailGenerator.run(videoPath, configFolder, cfg, job.getStreamIndex(), config.ffmpegThreads, probe.fps(), p -> activeProcesses.put(jobId, p));
           statsList.add(stats);
           log.info("[{}] Transcoding ({}) extraction={}ms postProcessing={}ms",
               strId, cfg.folderName(), stats.extractionMs(), stats.postProcessingMs());
@@ -309,26 +338,34 @@ public class ThumbnailsGenerationJobService {
       });
 
     } catch (Exception e) {
-      log.error("[{}] Processing failed: {}", strId, e.getMessage(), e);
-      FailureReason reason = toFailureReason(e);
-      try {
-        transactionTemplate.executeWithoutResult(status -> {
-          var j = thumbnailsGenerationJobRepository.findById(jobId).orElseThrow(ResourceNotFoundException::new);
-          if ((reason == FailureReason.UPLOAD_FAILED || reason == FailureReason.PROCESSING_FAILED) && j.getRetryCount() < config.maxRetries) {
-            log.warn("[{}] {} failed, scheduling retry (attempt {})", strId, reason, j.getRetryCount() + 1);
-            j.retry();
-            thumbnailsGenerationJobRepository.save(j);
-            applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobRetryEvent(j.getId()));
-          } else {
-            j.fail(reason);
-            thumbnailsGenerationJobRepository.save(j);
-          }
-        });
-      } catch (Exception saveException) {
-        log.error("[{}] Failed to persist failure status", strId, saveException);
+      boolean cancelled = thumbnailsGenerationJobRepository.findById(jobId)
+          .map(j -> j.getStatus() == ThumbnailsGenerationJob.Status.CANCELLED)
+          .orElse(false);
+      if (cancelled) {
+        log.info("[{}] Job was cancelled", strId);
+      } else {
+        log.error("[{}] Processing failed: {}", strId, e.getMessage(), e);
+        FailureReason reason = toFailureReason(e);
+        try {
+          transactionTemplate.executeWithoutResult(status -> {
+            var j = thumbnailsGenerationJobRepository.findById(jobId).orElseThrow(ResourceNotFoundException::new);
+            if ((reason == FailureReason.UPLOAD_FAILED || reason == FailureReason.PROCESSING_FAILED) && j.getRetryCount() < config.maxRetries) {
+              log.warn("[{}] {} failed, scheduling retry (attempt {})", strId, reason, j.getRetryCount() + 1);
+              j.retry();
+              thumbnailsGenerationJobRepository.save(j);
+              applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobRetryEvent(j.getId()));
+            } else {
+              j.fail(reason);
+              thumbnailsGenerationJobRepository.save(j);
+            }
+          });
+        } catch (Exception saveException) {
+          log.error("[{}] Failed to persist failure status", strId, saveException);
+        }
       }
     } finally {
       activeHeartbeats.remove(jobId);
+      activeProcesses.remove(jobId);
       if (heartbeat != null) heartbeat.cancel(false);
       if (jobFolder != null) deleteRecursively(jobFolder);
       try { if (zipFile != null) Files.deleteIfExists(zipFile); } catch (IOException ignored) {}

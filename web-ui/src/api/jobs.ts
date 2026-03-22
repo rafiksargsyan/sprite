@@ -59,6 +59,17 @@ export function getJobPreviewVtt(
   );
 }
 
+export function cancelJob(
+  user: User,
+  accountId: string,
+  jobId: string,
+): Promise<void> {
+  return apiRequest<void>(`/thumbnails-generation-job/${jobId}`, user, {
+    method: 'DELETE',
+    accountId,
+  });
+}
+
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
 
 export async function getJobLimits(): Promise<JobLimitsDTO> {

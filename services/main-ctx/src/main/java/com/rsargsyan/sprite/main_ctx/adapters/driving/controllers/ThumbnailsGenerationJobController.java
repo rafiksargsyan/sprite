@@ -69,4 +69,11 @@ public class ThumbnailsGenerationJobController {
         return new ResponseEntity<>(job, HttpStatus.CREATED);
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> cancel(@PathVariable String id) {
+        var userCtx = UserContextHolder.get();
+        thumbnailsGenerationJobService.cancel(userCtx.getAccountId(), id);
+        return ResponseEntity.noContent().build();
+    }
+
 }

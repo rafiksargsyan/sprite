@@ -132,6 +132,15 @@ public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
     touch();
   }
 
+  public void cancel() {
+    if (this.status == Status.SUCCESS || this.status == Status.FAILURE || this.status == Status.CANCELLED) {
+      throw new IllegalJobStateTransitionException(this.status, Status.CANCELLED);
+    }
+    this.status = Status.CANCELLED;
+    this.finishedAt = Instant.now();
+    touch();
+  }
+
   public enum Status {
     SUBMITTED,
     QUEUED,
@@ -139,6 +148,7 @@ public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
     IN_PROGRESS,
     RETRYING,
     SUCCESS,
-    FAILURE
+    FAILURE,
+    CANCELLED
   }
 }

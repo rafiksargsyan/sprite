@@ -32,10 +32,11 @@ import {
   FormControl,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import CancelIcon from '@mui/icons-material/Cancel';
 import DownloadIcon from '@mui/icons-material/Download';
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import { useAuth } from '../hooks/useAuth';
-import { listJobs, createJob, getJobLimits, getJobPreviewFiles, getJobPreviewVtt } from '../api/jobs';
+import { listJobs, createJob, cancelJob, getJobLimits, getJobPreviewFiles, getJobPreviewVtt } from '../api/jobs';
 import { listJobSpecs } from '../api/jobSpecs';
 import type { ThumbnailsGenerationJobDTO, JobSpecDTO, PreviewFilesResponse, ThumbnailConfigResponse } from '../types/api.types';
 import { configChipLabel, ConfigDetailDialog } from '../components/ConfigDetailDialog';
@@ -265,10 +266,16 @@ const STATUS_COLOR: Record<
   'default' | 'info' | 'warning' | 'success' | 'error'
 > = {
   SUBMITTED: 'info',
+  QUEUED: 'info',
+  RECEIVED: 'info',
   IN_PROGRESS: 'warning',
+  RETRYING: 'warning',
   SUCCESS: 'success',
   FAILURE: 'error',
+  CANCELLED: 'default',
 };
+
+const TERMINAL_STATUSES = new Set<ThumbnailsGenerationJobDTO['status']>(['SUCCESS', 'FAILURE', 'CANCELLED']);
 
 const FAILURE_REASON_LABEL: Record<import('../types/api.types').JobFailureReason, string> = {
   VIDEO_TOO_LARGE: 'Video too large',
@@ -296,6 +303,7 @@ export function Jobs() {
   const [maxFileSizeBytes, setMaxFileSizeBytes] = useState<number | null>(null);
   const [previewJob, setPreviewJob] = useState<ThumbnailsGenerationJobDTO | null>(null);
   const [selectedConfig, setSelectedConfig] = useState<ThumbnailConfigResponse | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   useEffect(() => {
     getJobLimits().then((l) => setMaxFileSizeBytes(l.maxFileSizeBytes)).catch(() => {});
@@ -338,6 +346,19 @@ export function Jobs() {
     }
   };
 
+  const handleCancel = async (jobId: string) => {
+    if (!user || !accountId) return;
+    setCancellingId(jobId);
+    try {
+      await cancelJob(user, accountId, jobId);
+      setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, status: 'CANCELLED' } : j));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to cancel job');
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
   return (
     <Box>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
@@ -372,6 +393,7 @@ export function Jobs() {
                 <TableCell>Cost</TableCell>
                 <TableCell>Download</TableCell>
                 <TableCell>Preview</TableCell>
+                <TableCell></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -459,6 +481,24 @@ export function Jobs() {
                             disabled={!job.previewAvailable}
                           >
                             Preview
+                          </Button>
+                        </span>
+                      </Tooltip>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {!TERMINAL_STATUSES.has(job.status) && (
+                      <Tooltip title="Cancel job">
+                        <span>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            startIcon={cancellingId === job.id ? <CircularProgress size={14} /> : <CancelIcon />}
+                            onClick={() => handleCancel(job.id)}
+                            disabled={cancellingId === job.id}
+                          >
+                            Cancel
                           </Button>
                         </span>
                       </Tooltip>

@@ -120,7 +120,7 @@ export type JobFailureReason =
 export interface ThumbnailsGenerationJobDTO {
   id: string;
   videoUrl: string;
-  status: 'SUBMITTED' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILURE';
+  status: 'SUBMITTED' | 'QUEUED' | 'RECEIVED' | 'IN_PROGRESS' | 'RETRYING' | 'SUCCESS' | 'FAILURE' | 'CANCELLED';
   jobSpec: { configs: ThumbnailConfigResponse[] };
   streamIndex: number | null;
   preview: boolean;
