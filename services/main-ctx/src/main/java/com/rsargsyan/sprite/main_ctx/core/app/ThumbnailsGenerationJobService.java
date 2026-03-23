@@ -315,7 +315,14 @@ public class ThumbnailsGenerationJobService {
       checkVideoAccessibility(videoUrl);
 
       long probeT = System.nanoTime();
-      VideoProbeResult probe = VideoThumbnailGenerator.probe(videoUrl, job.getStreamIndex());
+      VideoProbeResult probe;
+      try {
+        probe = VideoThumbnailGenerator.probe(videoUrl, job.getStreamIndex());
+      } catch (InvalidThumbnailConfigException e) {
+        throw e;
+      } catch (Exception e) {
+        throw new JobFailureException(FailureReason.PROCESSING_FAILED, e);
+      }
       log.info("[{}] Probe: {}s (codec={}, inputRes={}, duration={}s)", strId, elapsed(probeT),
           probe.codec(), probe.inputRes(), probe.durationSec());
 
