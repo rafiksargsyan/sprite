@@ -45,6 +45,11 @@ public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
 
   private Instant lastHeartbeatAt;
 
+  private Instant mqSentAt;
+
+  private Instant mqConfirmedAt;
+
+
   private int retryCount;
 
   @Type(JsonType.class)
@@ -109,6 +114,11 @@ public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
 
   public void heartbeat() {
     this.lastHeartbeatAt = Instant.now();
+  }
+
+  public void markMqSent() {
+    this.mqSentAt = Instant.now();
+    this.mqConfirmedAt = null;
   }
 
   public void recordStats(List<ConfigProcessingStats> stats) {

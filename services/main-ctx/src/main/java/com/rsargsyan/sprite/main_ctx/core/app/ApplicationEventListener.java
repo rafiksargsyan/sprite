@@ -5,6 +5,7 @@ import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.ThumbnailsGenerationJ
 import com.rsargsyan.sprite.main_ctx.core.ports.repository.ThumbnailsGenerationJobRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.MessageDeliveryMode;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
@@ -46,11 +47,9 @@ public class ApplicationEventListener {
         job -> {
           if (job.getStatus() == ThumbnailsGenerationJob.Status.SUBMITTED) {
             job.queue();
+            job.markMqSent();
             thumbnailsGenerationJobRepository.save(job);
-            rabbitTemplate.convertAndSend(config.topicExchangeName, "test", job.getStrId(), m -> {
-              m.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
-              return m;
-            });
+            sendToRabbitMq(job.getStrId());
           }
         },
         () -> log.warn("Job not found for create event: {}", event.jobId())
@@ -63,15 +62,20 @@ public class ApplicationEventListener {
         job -> {
           if (job.getStatus() == ThumbnailsGenerationJob.Status.RETRYING) {
             job.queue();
+            job.markMqSent();
             thumbnailsGenerationJobRepository.save(job);
-            rabbitTemplate.convertAndSend(config.topicExchangeName, "test", job.getStrId(), m -> {
-              m.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
-              return m;
-            });
+            sendToRabbitMq(job.getStrId());
           }
         },
         () -> log.warn("Job not found for retry event: {}", event.jobId())
     );
+  }
+
+  private void sendToRabbitMq(String strId) {
+    rabbitTemplate.convertAndSend(config.topicExchangeName, "test", strId, m -> {
+      m.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
+      return m;
+    }, new CorrelationData(strId));
   }
 
   @Async

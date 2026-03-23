@@ -1,5 +1,11 @@
 package com.rsargsyan.sprite.main_ctx;
 
+import com.rsargsyan.sprite.main_ctx.core.ports.repository.ThumbnailsGenerationJobRepository;
+import io.hypersistence.tsid.TSID;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,9 +16,14 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 import java.net.URI;
+import java.time.Instant;
 
+@Slf4j
 @Configuration
 public class Config {
+
+  @Autowired
+  private ThumbnailsGenerationJobRepository thumbnailsGenerationJobRepository;
   @Value("${rabbitmq.queue}")
   public String queueName;
 
@@ -66,6 +77,22 @@ public class Config {
         .credentialsProvider(StaticCredentialsProvider.create(
             AwsBasicCredentials.create(s3AccessKeyId, s3SecretAccessKey)))
         .build();
+  }
+
+  @Bean
+  public RabbitTemplate rabbitTemplate(CachingConnectionFactory connectionFactory) {
+    connectionFactory.setPublisherConfirmType(CachingConnectionFactory.ConfirmType.CORRELATED);
+    RabbitTemplate template = new RabbitTemplate(connectionFactory);
+    template.setConfirmCallback((correlationData, ack, cause) -> {
+      if (correlationData == null) return;
+      if (ack) {
+        thumbnailsGenerationJobRepository.updateMqConfirmedAt(
+            TSID.from(correlationData.getId()).toLong(), Instant.now());
+      } else {
+        log.warn("RabbitMQ NACKed message for job {}: {}", correlationData.getId(), cause);
+      }
+    });
+    return template;
   }
 
   @Bean(destroyMethod = "close")

@@ -23,6 +23,19 @@ public interface ThumbnailsGenerationJobRepository extends JpaRepository<Thumbna
   @Query("UPDATE ThumbnailsGenerationJob j SET j.lastHeartbeatAt = :now WHERE j.id = :id")
   void updateHeartbeat(@Param("id") Long id, @Param("now") Instant now);
 
-  @Query("SELECT j FROM ThumbnailsGenerationJob j WHERE j.status IN ('RECEIVED', 'IN_PROGRESS') AND j.lastHeartbeatAt < :threshold")
+  @Modifying
+  @Transactional
+  @Query("UPDATE ThumbnailsGenerationJob j SET j.mqConfirmedAt = :now WHERE j.id = :id")
+  void updateMqConfirmedAt(@Param("id") Long id, @Param("now") Instant now);
+
+  @Modifying
+  @Transactional
+  @Query("UPDATE ThumbnailsGenerationJob j SET j.mqSentAt = :now, j.mqConfirmedAt = null WHERE j.id = :id")
+  void updateMqSent(@Param("id") Long id, @Param("now") Instant now);
+
+  @Query("SELECT j FROM ThumbnailsGenerationJob j WHERE j.status = 'QUEUED' AND j.mqConfirmedAt IS NULL AND j.mqSentAt < :threshold")
+  List<ThumbnailsGenerationJob> findStuckQueuedJobs(@Param("threshold") Instant threshold);
+
+@Query("SELECT j FROM ThumbnailsGenerationJob j WHERE j.status IN ('RECEIVED', 'IN_PROGRESS') AND j.lastHeartbeatAt < :threshold")
   List<ThumbnailsGenerationJob> findStuckJobs(@Param("threshold") Instant threshold);
 }

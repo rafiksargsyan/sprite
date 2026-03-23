@@ -30,7 +30,6 @@ public class Config {
   @Autowired
   private ThumbnailsGenerationJobService thumbnailsGenerationJobService;
 
-
   private ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
   @Bean

@@ -19,6 +19,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.amqp.core.MessageDeliveryMode;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -69,6 +72,7 @@ public class ThumbnailsGenerationJobService {
   private final S3Presigner s3Presigner;
   private final Config config;
   private final TransactionTemplate transactionTemplate;
+  private final RabbitTemplate rabbitTemplate;
   private final ScheduledExecutorService heartbeatScheduler = Executors.newSingleThreadScheduledExecutor();
   private final ConcurrentHashMap<Long, ScheduledFuture<?>> activeHeartbeats = new ConcurrentHashMap<>();
   private final ConcurrentHashMap<Long, Process> activeProcesses = new ConcurrentHashMap<>();
@@ -84,7 +88,8 @@ public class ThumbnailsGenerationJobService {
       S3Client s3Client,
       S3Presigner s3Presigner,
       Config config,
-      TransactionTemplate transactionTemplate
+      TransactionTemplate transactionTemplate,
+      RabbitTemplate rabbitTemplate
   ) {
     this.thumbnailsGenerationJobRepository = thumbnailsGenerationJobRepository;
     this.applicationEventPublisher = applicationEventPublisher;
@@ -94,6 +99,7 @@ public class ThumbnailsGenerationJobService {
     this.s3Presigner = s3Presigner;
     this.config = config;
     this.transactionTemplate = transactionTemplate;
+    this.rabbitTemplate = rabbitTemplate;
     this.cancellationChecker.scheduleAtFixedRate(this::checkCancellations, 3, 3, TimeUnit.SECONDS);
     this.outputFolderCleaner.scheduleAtFixedRate(this::cleanOutputFolder, 1, 1, TimeUnit.HOURS);
   }
@@ -230,6 +236,17 @@ public class ThumbnailsGenerationJobService {
       }
       thumbnailsGenerationJobRepository.save(job);
     }
+
+    Instant mqConfirmThreshold = Instant.now().minusSeconds(30);
+    for (ThumbnailsGenerationJob job : thumbnailsGenerationJobRepository.findStuckQueuedJobs(mqConfirmThreshold)) {
+      log.warn("[{}] QUEUED job unconfirmed for >30s, resending to RabbitMQ", job.getStrId());
+      try {
+        thumbnailsGenerationJobRepository.updateMqSent(job.getId(), Instant.now());
+        sendToRabbitMq(job.getStrId());
+      } catch (Exception e) {
+        log.warn("[{}] Failed to resend to RabbitMQ: {}", job.getStrId(), e.getMessage());
+      }
+    }
   }
 
   @Transactional
@@ -278,7 +295,6 @@ public class ThumbnailsGenerationJobService {
     Path jobFolder = null;
     Path zipFile = null;
     final String strId = TSID.from(jobId).toString();
-    final boolean[] retryScheduled = {false};
 
     try {
       var job = transactionTemplate.execute(status -> {
@@ -393,7 +409,7 @@ public class ThumbnailsGenerationJobService {
               log.warn("[{}] {} failed, scheduling retry (attempt {})", strId, reason, j.getRetryCount() + 1);
               j.retry();
               thumbnailsGenerationJobRepository.save(j);
-              retryScheduled[0] = true;
+              applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobRetryEvent(jobId));
             } else {
               j.fail(reason);
               thumbnailsGenerationJobRepository.save(j);
@@ -409,10 +425,14 @@ public class ThumbnailsGenerationJobService {
       if (heartbeat != null) heartbeat.cancel(false);
       if (jobFolder != null) deleteRecursively(jobFolder);
       try { if (zipFile != null) Files.deleteIfExists(zipFile); } catch (IOException ignored) {}
-      if (retryScheduled[0]) {
-        applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobRetryEvent(jobId));
-      }
     }
+  }
+
+  private void sendToRabbitMq(String strId) {
+    rabbitTemplate.convertAndSend(config.topicExchangeName, "test", strId, m -> {
+      m.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
+      return m;
+    }, new CorrelationData(strId));
   }
 
   private static boolean isNetworkReachable() {
