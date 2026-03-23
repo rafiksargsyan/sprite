@@ -15,6 +15,7 @@ import {
   Avatar,
   Menu,
   MenuItem,
+  useTheme,
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
@@ -36,6 +37,7 @@ const NAV_ITEMS = [
 ];
 
 export function Layout() {
+  const theme = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const { user, signOut } = useAuth();
@@ -93,7 +95,7 @@ export function Layout() {
           </IconButton>
           <Box sx={{ flexGrow: 1 }} />
           <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} size="small">
-            <Avatar sx={{ width: 32, height: 32, fontSize: 14 }}>{avatarLabel}</Avatar>
+            <Avatar sx={{ width: 32, height: 32, fontSize: 14, border: `2px solid ${theme.palette.primary.main}` }}>{avatarLabel}</Avatar>
           </IconButton>
           <Menu
             anchorEl={anchorEl}
