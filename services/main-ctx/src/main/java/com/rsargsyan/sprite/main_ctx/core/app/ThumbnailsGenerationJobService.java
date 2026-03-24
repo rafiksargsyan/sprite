@@ -294,6 +294,7 @@ public class ThumbnailsGenerationJobService {
     ScheduledFuture<?> heartbeat = activeHeartbeats.get(jobId);
     Path jobFolder = null;
     Path zipFile = null;
+    Path videoFile = null;
     final String strId = TSID.from(jobId).toString();
 
     try {
@@ -342,9 +343,10 @@ public class ThumbnailsGenerationJobService {
       String videoPath;
       if (hasSufficientDiskSpace()) {
         Files.createDirectories(jobFolder);
+        videoFile = jobFolder.getParent().resolve(attemptKey + ".video");
         log.info("[{}] Downloading video: {}", strId, videoUrl);
         long t = System.nanoTime();
-        videoPath = downloadVideo(videoUrl, jobFolder).toString();
+        videoPath = downloadVideo(videoUrl, videoFile).toString();
         log.info("[{}] Download: {}s", strId, elapsed(t));
       } else {
         videoPath = videoUrl;
@@ -432,6 +434,7 @@ public class ThumbnailsGenerationJobService {
       if (heartbeat != null) heartbeat.cancel(false);
       if (jobFolder != null) deleteRecursively(jobFolder);
       try { if (zipFile != null) Files.deleteIfExists(zipFile); } catch (IOException ignored) {}
+      try { if (videoFile != null) Files.deleteIfExists(videoFile); } catch (IOException ignored) {}
     }
   }
 
@@ -488,8 +491,7 @@ public class ThumbnailsGenerationJobService {
     }
   }
 
-  private static Path downloadVideo(String videoUrl, Path jobFolder) {
-    Path videoFile = jobFolder.resolve("video");
+  private static Path downloadVideo(String videoUrl, Path videoFile) {
     try {
       java.net.HttpURLConnection conn = (java.net.HttpURLConnection) new java.net.URL(videoUrl).openConnection();
       conn.setConnectTimeout(15_000);
