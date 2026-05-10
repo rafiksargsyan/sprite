@@ -1,0 +1,19 @@
+FROM eclipse-temurin:21-jre-noble
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    imagemagick \
+    curl \
+    unzip \
+    && curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip \
+    && unzip -q /tmp/awscliv2.zip -d /tmp \
+    && /tmp/aws/install \
+    && rm -rf /tmp/awscliv2.zip /tmp/aws \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV SPRING_PROFILES_ACTIVE=worker
+
+WORKDIR /app
+COPY build/libs/*.jar app.jar
+
+ENTRYPOINT ["java", "-jar", "app.jar"]

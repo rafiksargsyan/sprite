@@ -28,7 +28,7 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useAuth } from '../hooks/useAuth';
 import { listJobSpecs, createJobSpec, deleteJobSpec } from '../api/jobSpecs';
-import type { JobSpecDTO, ThumbnailConfigRequest } from '../types/api.types';
+import type { JobSpecDTO, ThumbnailConfigRequest, ThumbnailConfigResponse } from '../types/api.types';
 import { configChipLabel, ConfigDetailDialog } from '../components/ConfigDetailDialog';
 
 interface ConfigDraft {

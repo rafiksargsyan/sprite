@@ -41,3 +41,26 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+tasks.register('dockerBuildBackend', Exec) {
+	dependsOn bootJar
+	commandLine 'sh', '-c', 'docker build -t rsargsyan/sprite-backend:latest .'
+}
+
+tasks.register('dockerBuildWorker', Exec) {
+	dependsOn bootJar
+	commandLine 'sh', '-c', 'docker build -f Dockerfile.worker -t rsargsyan/sprite-worker:latest .'
+}
+
+tasks.register('dockerPushBackend', Exec) {
+	commandLine 'sh', '-c', 'docker push rsargsyan/sprite-backend:latest'
+}
+
+tasks.register('dockerPushWorker', Exec) {
+	commandLine 'sh', '-c', 'docker push rsargsyan/sprite-worker:latest'
+}
+
+tasks.register('dockerPublish') {
+	dependsOn dockerBuildBackend, dockerBuildWorker
+	finalizedBy dockerPushBackend, dockerPushWorker
+}

@@ -1,6 +1,7 @@
 import type { User } from 'firebase/auth';
+import { env } from '../lib/env';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
+const BASE_URL = env.VITE_API_BASE_URL;
 
 export async function apiRequest<T>(
   path: string,

@@ -141,7 +141,7 @@ function PreviewDialog({ job, user, accountId, onClose }: PreviewDialogProps) {
     const pixels = decodeBlurhash(cue.hash, displayWidth, displayHeight);
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
-    const imageData = new ImageData(pixels, displayWidth, displayHeight);
+    const imageData = new ImageData(pixels as unknown as Uint8ClampedArray<ArrayBuffer>, displayWidth, displayHeight);
     ctx.putImageData(imageData, 0, 0);
   }, [cue, displayWidth, displayHeight]);
 

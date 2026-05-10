@@ -5,13 +5,15 @@ import com.rsargsyan.sprite.main_ctx.core.app.ThumbnailsGenerationJobService;
 import com.rsargsyan.sprite.main_ctx.core.exception.DomainException;
 import com.rsargsyan.sprite.main_ctx.core.exception.ResourceNotFoundException;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.core.*;
+import org.springframework.amqp.core.AcknowledgeMode;
+import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
 import org.springframework.amqp.rabbit.listener.api.ChannelAwareMessageListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -20,6 +22,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+@Profile("worker")
 @Slf4j
 @Configuration("workersConfig")
 public class Config {
@@ -75,18 +78,4 @@ public class Config {
     }
   }
 
-  @Bean
-  Queue queue() {
-    return new Queue(config.queueName, true);
-  }
-
-  @Bean
-  TopicExchange exchange() {
-    return new TopicExchange(config.topicExchangeName);
-  }
-
-  @Bean
-  Binding binding(Queue queue, TopicExchange exchange) {
-    return BindingBuilder.bind(queue).to(exchange).with("test");
-  }
 }

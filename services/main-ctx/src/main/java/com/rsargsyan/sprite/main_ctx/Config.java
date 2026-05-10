@@ -3,6 +3,10 @@ package com.rsargsyan.sprite.main_ctx;
 import com.rsargsyan.sprite.main_ctx.core.ports.repository.ThumbnailsGenerationJobRepository;
 import io.hypersistence.tsid.TSID;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.core.Binding;
+import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +17,7 @@ import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 import java.net.URI;
@@ -29,6 +34,9 @@ public class Config {
 
   @Value("${rabbitmq.topic.exchange.name}")
   public String topicExchangeName;
+
+  @Value("${rabbitmq.routing-key}")
+  public String routingKey;
 
   @Value("${s3.access-key-id}")
   public String s3AccessKeyId;
@@ -70,12 +78,28 @@ public class Config {
   public String baseOutputFolder;
 
   @Bean
+  public Queue queue() {
+    return new Queue(queueName, true);
+  }
+
+  @Bean
+  public TopicExchange exchange() {
+    return new TopicExchange(topicExchangeName);
+  }
+
+  @Bean
+  public Binding binding(Queue queue, TopicExchange exchange) {
+    return BindingBuilder.bind(queue).to(exchange).with(routingKey);
+  }
+
+  @Bean
   public S3Client s3Client() {
     return S3Client.builder()
         .endpointOverride(URI.create(s3Endpoint))
         .region(Region.of(s3Region))
         .credentialsProvider(StaticCredentialsProvider.create(
             AwsBasicCredentials.create(s3AccessKeyId, s3SecretAccessKey)))
+        .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
         .build();
   }
 
@@ -102,6 +126,7 @@ public class Config {
         .region(Region.of(s3Region))
         .credentialsProvider(StaticCredentialsProvider.create(
             AwsBasicCredentials.create(s3AccessKeyId, s3SecretAccessKey)))
+        .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
         .build();
   }
 

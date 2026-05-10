@@ -72,7 +72,7 @@ public class ApplicationEventListener {
   }
 
   private void sendToRabbitMq(String strId) {
-    rabbitTemplate.convertAndSend(config.topicExchangeName, "test", strId, m -> {
+    rabbitTemplate.convertAndSend(config.topicExchangeName, config.routingKey, strId, m -> {
       m.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
       return m;
     }, new CorrelationData(strId));
