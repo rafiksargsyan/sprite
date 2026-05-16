@@ -6,6 +6,7 @@ import com.rsargsyan.sprite.main_ctx.core.app.dto.ThumbnailsGenerationJobCreatio
 import com.rsargsyan.sprite.main_ctx.core.app.dto.ThumbnailsGenerationJobDTO;
 import com.rsargsyan.sprite.main_ctx.core.domain.aggregate.ThumbnailsGenerationJob;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.ConfigProcessingStats;
+import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.EmbeddedJobSpec;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.FailureReason;
 import com.rsargsyan.sprite.main_ctx.core.domain.valueobject.ThumbnailConfig;
 import com.rsargsyan.sprite.main_ctx.core.exception.*;
@@ -254,9 +255,17 @@ public class ThumbnailsGenerationJobService {
     var accountLongId = Util.validateTSID(accountId);
     var account = accountRepository.findById(accountLongId)
         .orElseThrow(ResourceNotFoundException::new);
-    var jobSpec = jobSpecRepository.findByAccountIdAndId(accountLongId, Util.validateTSID(dto.getJobSpecId()))
-        .orElseThrow(ResourceNotFoundException::new);
-    var job = new ThumbnailsGenerationJob(account, dto.getVideoURL(), jobSpec.toEmbedded(), dto.getStreamIndex(), dto.isPreview());
+    EmbeddedJobSpec embeddedJobSpec;
+    if (dto.getConfigs() != null && !dto.getConfigs().isEmpty()) {
+      embeddedJobSpec = new EmbeddedJobSpec(dto.getConfigs());
+    } else if (dto.getJobSpecId() != null && !dto.getJobSpecId().isBlank()) {
+      var jobSpec = jobSpecRepository.findByAccountIdAndId(accountLongId, Util.validateTSID(dto.getJobSpecId()))
+          .orElseThrow(ResourceNotFoundException::new);
+      embeddedJobSpec = jobSpec.toEmbedded();
+    } else {
+      throw new InvalidThumbnailConfigException("Either jobSpecId or configs must be provided");
+    }
+    var job = new ThumbnailsGenerationJob(account, dto.getVideoURL(), embeddedJobSpec, dto.getStreamIndex(), dto.isPreview());
     thumbnailsGenerationJobRepository.save(job);
     applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobCreatedEvent(job.getId()));
     return ThumbnailsGenerationJobDTO.from(job, null, false);

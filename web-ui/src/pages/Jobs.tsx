@@ -11,6 +11,7 @@ import {
   DialogContent,
   DialogTitle,
   FormControlLabel,
+  IconButton,
   MenuItem,
   Paper,
   Slider as MuiSlider,
@@ -32,13 +33,14 @@ import {
   FormControl,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
 import CancelIcon from '@mui/icons-material/Cancel';
 import DownloadIcon from '@mui/icons-material/Download';
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import { useAuth } from '../hooks/useAuth';
 import { listJobs, createJob, cancelJob, getJobLimits, getJobPreviewFiles, getJobPreviewVtt } from '../api/jobs';
 import { listJobSpecs } from '../api/jobSpecs';
-import type { ThumbnailsGenerationJobDTO, JobSpecDTO, PreviewFilesResponse, ThumbnailConfigResponse } from '../types/api.types';
+import type { ThumbnailsGenerationJobDTO, JobSpecDTO, PreviewFilesResponse, ThumbnailConfigResponse, ThumbnailConfigRequest } from '../types/api.types';
 import { configChipLabel, ConfigDetailDialog } from '../components/ConfigDetailDialog';
 
 const fmt = (ts: string | null) =>
@@ -284,6 +286,32 @@ const FAILURE_REASON_LABEL: Record<import('../types/api.types').JobFailureReason
   SERVER_ERROR: 'Server error',
 };
 
+interface ConfigDraft {
+  format: 'jpg' | 'webp' | 'avif' | 'blurhash';
+  resolution: number;
+  spriteRows: number;
+  spriteCols: number;
+  quality: number;
+  interval: number;
+  method: number;
+  componentsX: number;
+  componentsY: number;
+  folderName: string;
+}
+
+const defaultConfig = (): ConfigDraft => ({
+  format: 'jpg', resolution: 120, spriteRows: 10, spriteCols: 10,
+  quality: 85, interval: 10, method: 4, componentsX: 4, componentsY: 3, folderName: '',
+});
+
+function configDraftToRequest(c: ConfigDraft): ThumbnailConfigRequest {
+  const spriteSize = { rows: c.spriteRows, cols: c.spriteCols };
+  if (c.format === 'jpg') return { format: 'jpg', resolution: c.resolution, spriteSize, quality: c.quality, interval: c.interval, folderName: c.folderName };
+  if (c.format === 'avif') return { format: 'avif', resolution: c.resolution, spriteSize, quality: c.quality, interval: c.interval, folderName: c.folderName };
+  if (c.format === 'blurhash') return { format: 'blurhash', interval: c.interval, componentsX: c.componentsX, componentsY: c.componentsY, folderName: c.folderName };
+  return { format: 'webp', resolution: c.resolution, spriteSize, quality: c.quality, interval: c.interval, method: c.method, folderName: c.folderName };
+}
+
 export function Jobs() {
   const { user, accountId } = useAuth();
   const [jobs, setJobs] = useState<ThumbnailsGenerationJobDTO[]>([]);
@@ -297,7 +325,9 @@ export function Jobs() {
   const [error, setError] = useState('');
 
   const [videoURL, setVideoURL] = useState('');
+  const [specMode, setSpecMode] = useState<'existing' | 'custom'>('existing');
   const [jobSpecId, setJobSpecId] = useState('');
+  const [configs, setConfigs] = useState<ConfigDraft[]>([defaultConfig()]);
   const [streamIndex, setStreamIndex] = useState('');
   const [preview, setPreview] = useState(false);
   const [maxFileSizeBytes, setMaxFileSizeBytes] = useState<number | null>(null);
@@ -318,9 +348,16 @@ export function Jobs() {
       .finally(() => setLoading(false));
   }, [user, accountId, page, pageSize]);
 
+  const addConfig = () => setConfigs((prev) => [...prev, defaultConfig()]);
+  const removeConfig = (i: number) => setConfigs((prev) => prev.filter((_, idx) => idx !== i));
+  const updateConfig = (i: number, patch: Partial<ConfigDraft>) =>
+    setConfigs((prev) => prev.map((c, idx) => (idx === i ? { ...c, ...patch } : c)));
+
   const openDialog = () => {
     setVideoURL('');
+    setSpecMode(specs.length > 0 ? 'existing' : 'custom');
     setJobSpecId(specs[0]?.id ?? '');
+    setConfigs([defaultConfig()]);
     setStreamIndex('');
     setPreview(false);
     setError('');
@@ -333,7 +370,10 @@ export function Jobs() {
     setError('');
     try {
       const parsedStreamIndex = streamIndex.trim() !== '' ? parseInt(streamIndex, 10) : null;
-      await createJob(user, accountId, { videoURL, jobSpecId, streamIndex: parsedStreamIndex, preview });
+      const body = specMode === 'existing'
+        ? { videoURL, jobSpecId, streamIndex: parsedStreamIndex, preview }
+        : { videoURL, configs: configs.map(configDraftToRequest), streamIndex: parsedStreamIndex, preview };
+      await createJob(user, accountId, body);
       setPage(0);
       const refreshed = await listJobs(user, accountId, 0, pageSize);
       setJobs(refreshed.content);
@@ -363,16 +403,10 @@ export function Jobs() {
     <Box>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h5" fontWeight="bold">Jobs</Typography>
-        <Button variant="contained" color="secondary" startIcon={<AddIcon />} onClick={openDialog} disabled={specs.length === 0}>
+        <Button variant="contained" color="secondary" startIcon={<AddIcon />} onClick={openDialog}>
           New Job
         </Button>
       </Stack>
-
-      {specs.length === 0 && !loading && (
-        <Typography color="text.secondary" mb={2}>
-          Create a job spec first before submitting jobs.
-        </Typography>
-      )}
 
       {loading ? (
         <Box display="flex" justifyContent="center" mt={6}><CircularProgress /></Box>
@@ -551,18 +585,86 @@ export function Jobs() {
               required
               placeholder="https://example.com/video.mp4"
             />
-            <FormControl fullWidth required>
-              <InputLabel>Job Spec</InputLabel>
+            <FormControl fullWidth size="small">
+              <InputLabel>Spec source</InputLabel>
               <Select
-                label="Job Spec"
-                value={jobSpecId}
-                onChange={(e) => setJobSpecId(e.target.value)}
+                label="Spec source"
+                value={specMode}
+                onChange={(e) => setSpecMode(e.target.value as 'existing' | 'custom')}
               >
-                {specs.map((s) => (
-                  <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
-                ))}
+                <MenuItem value="existing" disabled={specs.length === 0}>Existing job spec</MenuItem>
+                <MenuItem value="custom">Custom (inline)</MenuItem>
               </Select>
             </FormControl>
+
+            {specMode === 'existing' && (
+              <FormControl fullWidth required>
+                <InputLabel>Job Spec</InputLabel>
+                <Select
+                  label="Job Spec"
+                  value={jobSpecId}
+                  onChange={(e) => setJobSpecId(e.target.value)}
+                >
+                  {specs.map((s) => (
+                    <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+
+            {specMode === 'custom' && (
+              <Stack spacing={1.5}>
+                {configs.map((cfg, i) => (
+                  <Stack key={i} spacing={1} sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                    <Stack direction="row" alignItems="center" justifyContent="space-between">
+                      <Typography variant="body2" fontWeight="medium">Config {i + 1}</Typography>
+                      <IconButton size="small" onClick={() => removeConfig(i)} disabled={configs.length === 1}>
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Stack>
+                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                      <TextField size="small" label="Folder name" value={cfg.folderName}
+                        onChange={(e) => updateConfig(i, { folderName: e.target.value })} sx={{ width: 130 }} />
+                      <FormControl size="small" sx={{ width: 110 }}>
+                        <InputLabel>Format</InputLabel>
+                        <Select label="Format" value={cfg.format}
+                          onChange={(e) => updateConfig(i, { format: e.target.value as ConfigDraft['format'], quality: e.target.value === 'jpg' ? 85 : 60 })}>
+                          <MenuItem value="jpg">JPG</MenuItem>
+                          <MenuItem value="webp">WebP</MenuItem>
+                          <MenuItem value="avif">AVIF</MenuItem>
+                          <MenuItem value="blurhash">Blurhash</MenuItem>
+                        </Select>
+                      </FormControl>
+                      <TextField size="small" label="Interval (s)" type="number" value={cfg.interval}
+                        onChange={(e) => updateConfig(i, { interval: +e.target.value })} sx={{ width: 100 }} />
+                      {cfg.format !== 'blurhash' && <>
+                        <TextField size="small" label="Resolution (px)" type="number" value={cfg.resolution}
+                          onChange={(e) => updateConfig(i, { resolution: +e.target.value })} sx={{ width: 130 }} />
+                        <TextField size="small" label="Quality" type="number" value={cfg.quality}
+                          onChange={(e) => updateConfig(i, { quality: +e.target.value })} sx={{ width: 80 }} />
+                        <TextField size="small" label="Rows" type="number" value={cfg.spriteRows}
+                          onChange={(e) => updateConfig(i, { spriteRows: +e.target.value })} sx={{ width: 70 }} />
+                        <TextField size="small" label="Cols" type="number" value={cfg.spriteCols}
+                          onChange={(e) => updateConfig(i, { spriteCols: +e.target.value })} sx={{ width: 70 }} />
+                      </>}
+                      {cfg.format === 'webp' && (
+                        <TextField size="small" label="Method (0-6)" type="number" value={cfg.method}
+                          onChange={(e) => updateConfig(i, { method: +e.target.value })} sx={{ width: 110 }} />
+                      )}
+                      {cfg.format === 'blurhash' && <>
+                        <TextField size="small" label="Components X" type="number" value={cfg.componentsX}
+                          onChange={(e) => updateConfig(i, { componentsX: +e.target.value })} sx={{ width: 120 }} />
+                        <TextField size="small" label="Components Y" type="number" value={cfg.componentsY}
+                          onChange={(e) => updateConfig(i, { componentsY: +e.target.value })} sx={{ width: 120 }} />
+                      </>}
+                    </Stack>
+                  </Stack>
+                ))}
+                <Button size="small" startIcon={<AddIcon />} onClick={addConfig} disabled={configs.length >= 5}>
+                  Add Config
+                </Button>
+              </Stack>
+            )}
             <TextField
               label="Stream index"
               value={streamIndex}
@@ -584,7 +686,7 @@ export function Jobs() {
           <Button
             variant="contained"
             onClick={handleCreate}
-            disabled={saving || !videoURL.trim() || !jobSpecId}
+            disabled={saving || !videoURL.trim() || (specMode === 'existing' && !jobSpecId)}
           >
             {saving ? <CircularProgress size={20} /> : 'Submit'}
           </Button>

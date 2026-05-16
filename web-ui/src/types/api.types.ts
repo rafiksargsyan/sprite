@@ -135,7 +135,8 @@ export interface ThumbnailsGenerationJobDTO {
 
 export interface ThumbnailsGenerationJobCreationRequest {
   videoURL: string;
-  jobSpecId: string;
+  jobSpecId?: string | null;
+  configs?: ThumbnailConfigRequest[] | null;
   streamIndex?: number | null;
   preview?: boolean;
 }
