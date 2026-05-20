@@ -173,7 +173,7 @@ function PreviewDialog({ job, user, accountId, onClose }: PreviewDialogProps) {
               </Typography>
               <MuiSlider
                 min={120}
-                max={640}
+                max={1280}
                 step={10}
                 value={displayWidth}
                 onChange={(_, v) => setDisplayWidth(v as number)}
@@ -192,15 +192,30 @@ function PreviewDialog({ job, user, accountId, onClose }: PreviewDialogProps) {
 
           {cue && (
             <Stack spacing={1} alignItems="center" sx={{ opacity: loading ? 0.4 : 1, transition: 'opacity 0.2s' }}>
-              {cue.type === 'blurhash' ? (
-                <canvas
-                  ref={canvasRef}
-                  width={displayWidth}
-                  height={displayHeight}
-                  style={{ border: '1px solid', borderColor: 'divider', display: 'block' }}
-                />
-              ) : (
-                <>
+              <Box sx={{ position: 'relative', display: 'inline-block', mt: '20px', mr: '48px' }}>
+                {/* Width label — top */}
+                <Typography variant="caption" color="text.secondary" sx={{
+                  position: 'absolute', top: -18, left: 0, right: 0,
+                  textAlign: 'center', fontSize: '0.7rem', lineHeight: 1,
+                }}>
+                  {displayWidth}px
+                </Typography>
+                {/* Height label — right, rotated */}
+                <Typography variant="caption" color="text.secondary" sx={{
+                  position: 'absolute', right: -44, top: '50%',
+                  transform: 'translateY(-50%) rotate(90deg)',
+                  whiteSpace: 'nowrap', fontSize: '0.7rem', lineHeight: 1,
+                }}>
+                  {displayHeight}px
+                </Typography>
+                {cue.type === 'blurhash' ? (
+                  <canvas
+                    ref={canvasRef}
+                    width={displayWidth}
+                    height={displayHeight}
+                    style={{ border: '1px solid', borderColor: 'divider', display: 'block' }}
+                  />
+                ) : (
                   <Box
                     sx={{
                       width: displayWidth,
@@ -216,13 +231,15 @@ function PreviewDialog({ job, user, accountId, onClose }: PreviewDialogProps) {
                       flexShrink: 0,
                     }}
                   />
-                  <img
-                    ref={imgRef}
-                    src={spriteUrl ?? undefined}
-                    style={{ display: 'none' }}
-                    onLoad={(e) => setSheetSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
-                  />
-                </>
+                )}
+              </Box>
+              {cue.type !== 'blurhash' && (
+                <img
+                  ref={imgRef}
+                  src={spriteUrl ?? undefined}
+                  style={{ display: 'none' }}
+                  onLoad={(e) => setSheetSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+                />
               )}
               <Box width="100%">
                 <MuiSlider
