@@ -22,7 +22,7 @@ import java.util.List;
 @Entity
 @Getter
 public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
-  @Column(name = "url")
+  @Column(name = "url", columnDefinition = "text")
   private URL videoURL;
 
   @Enumerated(EnumType.STRING)

@@ -470,13 +470,14 @@ public class ThumbnailsGenerationJobService {
           .connectTimeout(Duration.ofSeconds(15))
           .build();
       var request = HttpRequest.newBuilder()
-          .method("HEAD", HttpRequest.BodyPublishers.noBody())
+          .GET()
           .uri(URI.create(videoUrl))
+          .header("Range", "bytes=0-0")
           .timeout(Duration.ofSeconds(30))
           .build();
       var response = client.send(request, HttpResponse.BodyHandlers.discarding());
       int status = response.statusCode();
-      if (status >= 400 && status != 405) {
+      if (status >= 400) {
         throw new VideoNotAccessibleException("Video returned HTTP " + status + ": " + videoUrl);
       }
       response.headers().firstValueAsLong("content-length").ifPresent(size -> {
