@@ -49,7 +49,6 @@ public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
 
   private Instant mqConfirmedAt;
 
-
   private int retryCount;
 
   @Type(JsonType.class)
@@ -57,6 +56,8 @@ public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
   private List<ConfigProcessingStats> processingStats;
 
   private Double cost;
+
+  private Instant s3DeletedAt;
 
   @SuppressWarnings("unused")
   ThumbnailsGenerationJob() {}
@@ -143,6 +144,10 @@ public class ThumbnailsGenerationJob extends AccountScopedAggregateRoot {
     this.failureReason = reason;
     this.finishedAt = Instant.now();
     touch();
+  }
+
+  public void markS3Deleted() {
+    this.s3DeletedAt = Instant.now();
   }
 
   public void cancel() {

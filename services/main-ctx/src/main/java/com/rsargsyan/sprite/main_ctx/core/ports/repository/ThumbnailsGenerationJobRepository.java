@@ -36,6 +36,12 @@ public interface ThumbnailsGenerationJobRepository extends JpaRepository<Thumbna
   @Query("SELECT j FROM ThumbnailsGenerationJob j WHERE j.status = 'QUEUED' AND j.mqConfirmedAt IS NULL AND j.mqSentAt < :threshold")
   List<ThumbnailsGenerationJob> findStuckQueuedJobs(@Param("threshold") Instant threshold);
 
-@Query("SELECT j FROM ThumbnailsGenerationJob j WHERE j.status IN ('RECEIVED', 'IN_PROGRESS') AND j.lastHeartbeatAt < :threshold")
+  @Query("SELECT j FROM ThumbnailsGenerationJob j WHERE j.status IN ('RECEIVED', 'IN_PROGRESS') AND j.lastHeartbeatAt < :threshold")
   List<ThumbnailsGenerationJob> findStuckJobs(@Param("threshold") Instant threshold);
+
+  @Query("SELECT j FROM ThumbnailsGenerationJob j WHERE j.status IN ('SUCCESS', 'FAILURE', 'CANCELLED') AND j.s3DeletedAt IS NULL AND j.finishedAt < :threshold")
+  List<ThumbnailsGenerationJob> findJobsForS3Cleanup(@Param("threshold") Instant threshold);
+
+  @Query("SELECT j FROM ThumbnailsGenerationJob j WHERE j.finishedAt < :threshold")
+  List<ThumbnailsGenerationJob> findJobsForDeletion(@Param("threshold") Instant threshold);
 }

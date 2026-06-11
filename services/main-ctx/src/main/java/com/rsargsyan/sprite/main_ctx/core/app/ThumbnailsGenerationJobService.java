@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
@@ -61,9 +62,6 @@ import java.util.zip.ZipOutputStream;
 @Service
 public class ThumbnailsGenerationJobService {
 
-  private static final Duration DOWNLOAD_WINDOW = Duration.ofHours(2);
-
-  private static final Duration PREVIEW_URL_TTL = Duration.ofHours(1);
 
   private final ApplicationEventPublisher applicationEventPublisher;
   private final ThumbnailsGenerationJobRepository thumbnailsGenerationJobRepository;
@@ -79,6 +77,7 @@ public class ThumbnailsGenerationJobService {
   private final ConcurrentHashMap<Long, Process> activeProcesses = new ConcurrentHashMap<>();
   private final ScheduledExecutorService cancellationChecker = Executors.newSingleThreadScheduledExecutor();
   private final ScheduledExecutorService outputFolderCleaner = Executors.newSingleThreadScheduledExecutor();
+  private final ScheduledExecutorService jobCleaner = Executors.newSingleThreadScheduledExecutor();
 
   @Autowired
   public ThumbnailsGenerationJobService(
@@ -103,19 +102,20 @@ public class ThumbnailsGenerationJobService {
     this.rabbitTemplate = rabbitTemplate;
     this.cancellationChecker.scheduleAtFixedRate(this::checkCancellations, 3, 3, TimeUnit.SECONDS);
     this.outputFolderCleaner.scheduleAtFixedRate(this::cleanOutputFolder, 1, 1, TimeUnit.HOURS);
+    this.jobCleaner.scheduleAtFixedRate(this::cleanupJobs, 1, 1, TimeUnit.HOURS);
   }
 
   public Page<ThumbnailsGenerationJobDTO> findAll(String accountId, int page, int size) {
     var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
     return thumbnailsGenerationJobRepository.findByAccountId(Util.validateTSID(accountId), pageable)
-        .map(job -> ThumbnailsGenerationJobDTO.from(job, presignedDownloadUrl(job), isPreviewAvailable(job)));
+        .map(job -> ThumbnailsGenerationJobDTO.from(job, presignedDownloadUrl(job), isPreviewAvailable(job), expiresAt(job)));
   }
 
   public ThumbnailsGenerationJobDTO findById(String accountId, String jobId) {
     var job = thumbnailsGenerationJobRepository
         .findByAccountIdAndId(Util.validateTSID(accountId), Util.validateTSID(jobId))
         .orElseThrow(ResourceNotFoundException::new);
-    return ThumbnailsGenerationJobDTO.from(job, presignedDownloadUrl(job), isPreviewAvailable(job));
+    return ThumbnailsGenerationJobDTO.from(job, presignedDownloadUrl(job), isPreviewAvailable(job), expiresAt(job));
   }
 
   public Map<String, String> getPreviewFiles(String accountId, String jobId, String configFolderName) {
@@ -133,12 +133,18 @@ public class ThumbnailsGenerationJobService {
         .prefix(prefix)
         .build());
 
+    Instant exp = expiresAt(job);
+    if (exp == null || !Instant.now().isBefore(exp)) throw new ResourceNotFoundException();
+    Duration remaining = Duration.between(Instant.now(), exp);
+    Duration presignedUrlMax = Duration.ofSeconds(config.presignedUrlMaxSeconds);
+    Duration urlTtl = remaining.compareTo(presignedUrlMax) < 0 ? remaining : presignedUrlMax;
+
     Map<String, String> result = new LinkedHashMap<>();
     for (var obj : listed.contents()) {
       String filename = obj.key().substring(prefix.length());
       if (filename.isEmpty()) continue;
       var presignRequest = GetObjectPresignRequest.builder()
-          .signatureDuration(PREVIEW_URL_TTL)
+          .signatureDuration(urlTtl)
           .getObjectRequest(GetObjectRequest.builder()
               .bucket(config.s3Bucket)
               .key(obj.key())
@@ -186,8 +192,11 @@ public class ThumbnailsGenerationJobService {
   private void checkCancellations() {
     if (activeProcesses.isEmpty()) return;
     try {
+      Instant oneDayAgo = Instant.now().minus(Duration.ofDays(1));
       thumbnailsGenerationJobRepository.findAllById(activeProcesses.keySet()).forEach(job -> {
-        if (job.getStatus() == ThumbnailsGenerationJob.Status.CANCELLED) {
+        if (job.getStatus() == ThumbnailsGenerationJob.Status.CANCELLED
+            && job.getFinishedAt() != null
+            && job.getFinishedAt().isAfter(oneDayAgo)) {
           Process process = activeProcesses.get(job.getId());
           if (process != null) {
             log.info("[{}] Cancelling active process", job.getStrId());
@@ -220,33 +229,82 @@ public class ThumbnailsGenerationJobService {
     }
   }
 
-  @Transactional
+  private void cleanupJobs() {
+    try {
+      Instant s3ExpiryThreshold = Instant.now().minus(Duration.ofSeconds(config.s3ExpirySeconds));
+      for (ThumbnailsGenerationJob job : thumbnailsGenerationJobRepository.findJobsForS3Cleanup(s3ExpiryThreshold)) {
+        try {
+          deleteS3Folder(job.getStrId());
+          transactionTemplate.executeWithoutResult(status -> {
+            thumbnailsGenerationJobRepository.findById(job.getId()).ifPresent(j -> {
+              j.markS3Deleted();
+              thumbnailsGenerationJobRepository.save(j);
+            });
+          });
+          log.info("[{}] S3 folder deleted", job.getStrId());
+        } catch (Exception e) {
+          log.warn("[{}] Failed to delete S3 folder: {}", job.getStrId(), e.getMessage());
+        }
+      }
+    } catch (Exception e) {
+      log.warn("S3 cleanup failed: {}", e.getMessage());
+    }
+
+    try {
+      Instant retentionThreshold = Instant.now().minus(Duration.ofSeconds(config.retentionSeconds));
+      List<ThumbnailsGenerationJob> jobsToDelete = thumbnailsGenerationJobRepository.findJobsForDeletion(retentionThreshold);
+      if (!jobsToDelete.isEmpty()) {
+        thumbnailsGenerationJobRepository.deleteAll(jobsToDelete);
+        log.info("Deleted {} expired jobs", jobsToDelete.size());
+      }
+    } catch (Exception e) {
+      log.warn("Job deletion failed: {}", e.getMessage());
+    }
+  }
+
+  private void deleteS3Folder(String strId) {
+    String prefix = strId + "/";
+    var listed = s3Client.listObjectsV2(ListObjectsV2Request.builder()
+        .bucket(config.s3Bucket)
+        .prefix(prefix)
+        .build());
+    for (var obj : listed.contents()) {
+      s3Client.deleteObject(DeleteObjectRequest.builder()
+          .bucket(config.s3Bucket)
+          .key(obj.key())
+          .build());
+    }
+    s3Client.deleteObject(DeleteObjectRequest.builder()
+        .bucket(config.s3Bucket)
+        .key(strId + ".zip")
+        .build());
+  }
+
   public void retryStuckJobs() {
     Instant threshold = Instant.now().minusSeconds(config.staleHeartbeatSeconds);
     List<ThumbnailsGenerationJob> stuckJobs = thumbnailsGenerationJobRepository.findStuckJobs(threshold);
     for (ThumbnailsGenerationJob job : stuckJobs) {
-      if (job.getRetryCount() >= config.maxRetries) {
-        log.warn("[{}] Job exceeded max retries ({}), marking as FAILURE", job.getStrId(), config.maxRetries);
-        job.fail(FailureReason.UNKNOWN);
-      } else {
-        log.warn("[{}] Retrying stuck job (attempt {})", job.getStrId(), job.getRetryCount() + 1);
-        Process stuckProcess = activeProcesses.remove(job.getId());
-        if (stuckProcess != null) stuckProcess.destroyForcibly();
-        job.retry();
-        applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobRetryEvent(job.getId()));
-      }
-      thumbnailsGenerationJobRepository.save(job);
+      transactionTemplate.executeWithoutResult(status -> {
+        if (job.getRetryCount() >= config.maxRetries) {
+          log.warn("[{}] Job exceeded max retries ({}), marking as FAILURE", job.getStrId(), config.maxRetries);
+          job.fail(FailureReason.UNKNOWN);
+          thumbnailsGenerationJobRepository.save(job);
+        } else {
+          log.warn("[{}] Retrying stuck job (attempt {})", job.getStrId(), job.getRetryCount() + 1);
+          job.retry();
+          thumbnailsGenerationJobRepository.save(job);
+          applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobRetryEvent(job.getId()));
+        }
+      });
     }
 
     Instant mqConfirmThreshold = Instant.now().minusSeconds(30);
     for (ThumbnailsGenerationJob job : thumbnailsGenerationJobRepository.findStuckQueuedJobs(mqConfirmThreshold)) {
-      log.warn("[{}] QUEUED job unconfirmed for >30s, resending to RabbitMQ", job.getStrId());
-      try {
+      transactionTemplate.executeWithoutResult(status -> {
+        log.warn("[{}] QUEUED job unconfirmed for >30s, resending to RabbitMQ", job.getStrId());
         thumbnailsGenerationJobRepository.updateMqSent(job.getId(), Instant.now());
         sendToRabbitMq(job.getStrId());
-      } catch (Exception e) {
-        log.warn("[{}] Failed to resend to RabbitMQ: {}", job.getStrId(), e.getMessage());
-      }
+      });
     }
   }
 
@@ -268,7 +326,7 @@ public class ThumbnailsGenerationJobService {
     var job = new ThumbnailsGenerationJob(account, dto.getVideoURL(), embeddedJobSpec, dto.getStreamIndex(), dto.isPreview());
     thumbnailsGenerationJobRepository.save(job);
     applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobCreatedEvent(job.getId()));
-    return ThumbnailsGenerationJobDTO.from(job, null, false);
+    return ThumbnailsGenerationJobDTO.from(job, null, false, null);
   }
 
   @Transactional
@@ -365,7 +423,8 @@ public class ThumbnailsGenerationJobService {
       for (ThumbnailConfig cfg : configs) {
         Path configFolder = jobFolder.resolve(cfg.folderName());
         try {
-          ConfigProcessingStats stats = VideoThumbnailGenerator.run(videoPath, configFolder, cfg, job.getStreamIndex(), config.ffmpegThreads, probe.fps(), p -> activeProcesses.put(jobId, p));
+          ConfigProcessingStats stats = VideoThumbnailGenerator.run(videoPath, configFolder, cfg, job.getStreamIndex(),
+              config.ffmpegThreads, probe.fps(), p -> activeProcesses.put(jobId, p));
           statsList.add(stats);
           log.info("[{}] Transcoding ({}) extraction={}ms postProcessing={}ms",
               strId, cfg.folderName(), stats.extractionMs(), stats.postProcessingMs());
@@ -383,7 +442,7 @@ public class ThumbnailsGenerationJobService {
       if (job.isPreview()) {
         try {
           long pt = System.nanoTime();
-          awsS3Upload(jobFolder, strId + "/", true);
+          awsS3Upload(jobId, jobFolder, strId + "/", true);
           log.info("[{}] Preview upload: {}s", strId, elapsed(pt));
         } catch (Exception ignored) {
           // Directory upload is best-effort; zip upload is the source of truth
@@ -392,7 +451,7 @@ public class ThumbnailsGenerationJobService {
 
       long ut = System.nanoTime();
       try {
-        awsS3Upload(zipFile, strId + ".zip", false);
+        awsS3Upload(jobId, zipFile, strId + ".zip", false);
       } catch (Exception e) {
         throw new JobFailureException(FailureReason.UPLOAD_FAILED, e);
       }
@@ -400,6 +459,10 @@ public class ThumbnailsGenerationJobService {
 
       transactionTemplate.executeWithoutResult(status -> {
         var j = thumbnailsGenerationJobRepository.findById(jobId).orElseThrow(ResourceNotFoundException::new);
+        if (j.getStatus() == ThumbnailsGenerationJob.Status.CANCELLED) {
+          log.info("[{}] Job was cancelled during upload, skipping success", strId);
+          return;
+        }
         j.recordStats(statsList);
         j.succeed();
         thumbnailsGenerationJobRepository.save(j);
@@ -522,7 +585,7 @@ public class ThumbnailsGenerationJobService {
     return videoFile;
   }
 
-  private void awsS3Upload(Path source, String s3Key, boolean recursive) throws Exception {
+  private void awsS3Upload(Long jobId, Path source, String s3Key, boolean recursive) throws Exception {
     ProcessBuilder pb = new ProcessBuilder(
         "aws", "s3", "cp",
         source.toString(),
@@ -536,7 +599,14 @@ public class ThumbnailsGenerationJobService {
     pb.environment().put("AWS_SECRET_ACCESS_KEY", config.s3SecretAccessKey);
     pb.environment().put("AWS_DEFAULT_REGION", config.s3Region);
     pb.inheritIO();
-    int exitCode = pb.start().waitFor();
+    Process process = pb.start();
+    activeProcesses.put(jobId, process);
+    int exitCode;
+    try {
+      exitCode = process.waitFor();
+    } finally {
+      activeProcesses.remove(jobId);
+    }
     if (exitCode != 0) {
       throw new RuntimeException("aws s3 cp failed with exit code " + exitCode);
     }
@@ -580,18 +650,30 @@ public class ThumbnailsGenerationJobService {
     return FailureReason.UNKNOWN;
   }
 
+  private Instant expiresAt(ThumbnailsGenerationJob job) {
+    if (job.getStatus() != ThumbnailsGenerationJob.Status.SUCCESS) return null;
+    if (job.getS3DeletedAt() != null) return null;
+    return job.getFinishedAt()
+        .plus(Duration.ofSeconds(config.s3ExpirySeconds))
+        .minus(Duration.ofSeconds(config.s3ExpirySafetyBufferSeconds));
+  }
+
   private boolean isPreviewAvailable(ThumbnailsGenerationJob job) {
-    if (!job.isPreview() || job.getStatus() != ThumbnailsGenerationJob.Status.SUCCESS) return false;
-    return Instant.now().isBefore(job.getFinishedAt().plus(DOWNLOAD_WINDOW));
+    if (!job.isPreview()) return false;
+    Instant exp = expiresAt(job);
+    return exp != null && Instant.now().isBefore(exp);
   }
 
   private String presignedDownloadUrl(ThumbnailsGenerationJob job) {
-    if (job.getStatus() != ThumbnailsGenerationJob.Status.SUCCESS) return null;
-    Instant expiry = job.getFinishedAt().plus(DOWNLOAD_WINDOW);
+    Instant exp = expiresAt(job);
+    if (exp == null) return null;
     Instant now = Instant.now();
-    if (!now.isBefore(expiry)) return null;
+    if (!now.isBefore(exp)) return null;
+    Duration remaining = Duration.between(now, exp);
+    Duration presignedUrlMax = Duration.ofSeconds(config.presignedUrlMaxSeconds);
+    Duration urlTtl = remaining.compareTo(presignedUrlMax) < 0 ? remaining : presignedUrlMax;
     var presignRequest = GetObjectPresignRequest.builder()
-        .signatureDuration(Duration.between(now, expiry))
+        .signatureDuration(urlTtl)
         .getObjectRequest(GetObjectRequest.builder()
             .bucket(config.s3Bucket)
             .key(job.getStrId() + ".zip")

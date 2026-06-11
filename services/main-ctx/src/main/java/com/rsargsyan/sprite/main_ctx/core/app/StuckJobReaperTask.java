@@ -15,6 +15,7 @@ import java.time.Duration;
 @Configuration
 public class StuckJobReaperTask {
 
+  @SuppressWarnings(value = "unused")
   @Bean
   public RecurringTask<Void> stuckJobReaper(ThumbnailsGenerationJobService jobService) {
     return Tasks.recurring("stuck-job-reaper", Schedules.fixedDelay(Duration.ofSeconds(60)))

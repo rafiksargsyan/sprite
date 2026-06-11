@@ -25,15 +25,18 @@ import java.util.concurrent.TimeUnit;
 @Profile("worker")
 @Slf4j
 @Configuration("workersConfig")
+@SuppressWarnings(value="unused")
 public class Config {
 
+  @SuppressWarnings(value="unused")
   @Autowired
   private com.rsargsyan.sprite.main_ctx.Config config;
 
+  @SuppressWarnings(value="unused")
   @Autowired
   private ThumbnailsGenerationJobService thumbnailsGenerationJobService;
 
-  private ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+  private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
   @Bean
   SimpleMessageListenerContainer container(ConnectionFactory connectionFactory,

@@ -1,10 +1,12 @@
 FROM node:22-alpine AS builder
 
-RUN npm install -g pnpm
+RUN npm install -g pnpm@10.32.1
+
+ENV CI=true
 
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile --ignore-scripts && pnpm rebuild esbuild
+RUN pnpm install --frozen-lockfile
 COPY . .
 RUN export BUILD_TS=$(date +%s) && pnpm run build && echo "$BUILD_TS" > /app/dist/.build-ts
 

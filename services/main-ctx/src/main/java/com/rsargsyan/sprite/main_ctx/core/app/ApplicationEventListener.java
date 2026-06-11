@@ -17,6 +17,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 
+@SuppressWarnings(value = "unused")
 @Slf4j
 @Component
 public class ApplicationEventListener {
@@ -41,6 +42,7 @@ public class ApplicationEventListener {
     this.processingSemaphore = new Semaphore(config.processingPoolSize);
   }
 
+  @SuppressWarnings(value="unused")
   @EventListener
   public void handleThumbnailsGenerationJobCreatedEvent(ThumbnailsGenerationJobCreatedEvent event) {
     thumbnailsGenerationJobRepository.findById(event.jobId()).ifPresentOrElse(
@@ -56,6 +58,7 @@ public class ApplicationEventListener {
     );
   }
 
+  @SuppressWarnings(value="unused")
   @EventListener
   public void handleThumbnailsGenerationJobRetryEvent(ThumbnailsGenerationJobRetryEvent event) {
     thumbnailsGenerationJobRepository.findById(event.jobId()).ifPresentOrElse(
@@ -78,6 +81,7 @@ public class ApplicationEventListener {
     }, new CorrelationData(strId));
   }
 
+  @SuppressWarnings(value="unused")
   @Async
   @TransactionalEventListener
   public void handleThumbnailsGenerationJobReceivedEvent(ThumbnailsGenerationJobReceivedEvent event) {
@@ -90,8 +94,8 @@ public class ApplicationEventListener {
         } finally {
           processingSemaphore.release();
         }
-      } catch (Exception e) {
-        log.error("Unexpected error processing job {}", event.jobId(), e);
+      } catch (InterruptedException e) {
+        log.warn("Interrupted while acquiring semaphore for processing job {}", event.jobId(), e);
       }
     });
   }

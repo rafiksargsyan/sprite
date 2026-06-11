@@ -128,6 +128,7 @@ export interface ThumbnailsGenerationJobDTO {
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
+  expiresAt: string | null;
   downloadUrl: string | null;
   failureReason: JobFailureReason | null;
   cost: number | null;

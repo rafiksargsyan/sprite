@@ -35,6 +35,7 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CancelIcon from '@mui/icons-material/Cancel';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DownloadIcon from '@mui/icons-material/Download';
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import { useAuth } from '../hooks/useAuth';
@@ -351,6 +352,30 @@ export function Jobs() {
   const [previewJob, setPreviewJob] = useState<ThumbnailsGenerationJobDTO | null>(null);
   const [selectedConfig, setSelectedConfig] = useState<ThumbnailConfigResponse | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyVideoUrl = (jobId: string, url: string) => {
+    const doCopy = (text: string) => {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+      } else {
+        fallbackCopy(text);
+      }
+      setCopiedId(jobId);
+      setTimeout(() => setCopiedId(null), 1500);
+    };
+    const fallbackCopy = (text: string) => {
+      const el = document.createElement('textarea');
+      el.value = text;
+      el.style.position = 'fixed';
+      el.style.opacity = '0';
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+    };
+    doCopy(url);
+  };
 
   useEffect(() => {
     getJobLimits().then((l) => setMaxFileSizeBytes(l.maxFileSizeBytes)).catch(() => {});
@@ -441,10 +466,9 @@ export function Jobs() {
                 <TableCell>Created</TableCell>
                 <TableCell>Started</TableCell>
                 <TableCell>Finished</TableCell>
+                <TableCell>Expires</TableCell>
                 <TableCell>Cost</TableCell>
-                <TableCell>Download</TableCell>
-                <TableCell>Preview</TableCell>
-                <TableCell></TableCell>
+                <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -453,8 +477,19 @@ export function Jobs() {
                   <TableCell>
                     <Typography variant="body2" fontFamily="monospace">{job.id}</Typography>
                   </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">{job.videoUrl}</Typography>
+                  <TableCell sx={{ maxWidth: 220 }}>
+                    <Stack direction="row" alignItems="center" gap={0.5}>
+                      <Tooltip title={job.videoUrl}>
+                        <Typography variant="body2" noWrap sx={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
+                          {job.videoUrl}
+                        </Typography>
+                      </Tooltip>
+                      <Tooltip title={copiedId === job.id ? 'Copied!' : 'Copy URL'}>
+                        <IconButton size="small" onClick={() => copyVideoUrl(job.id, job.videoUrl)}>
+                          <ContentCopyIcon sx={{ fontSize: 14 }} />
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
                   </TableCell>
                   <TableCell>
                     <Stack direction="row" gap={0.5} flexWrap="wrap">
@@ -482,78 +517,79 @@ export function Jobs() {
                     <Typography variant="body2" color="text.secondary" noWrap>{fmt(job.finishedAt)}</Typography>
                   </TableCell>
                   <TableCell>
+                    <Typography variant="body2" color="text.secondary" noWrap>{fmt(job.expiresAt)}</Typography>
+                  </TableCell>
+                  <TableCell>
                     <Typography variant="body2">
                       {job.cost != null ? Math.round(job.cost) : '—'}
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Tooltip title={
-                      job.downloadUrl
-                        ? 'Download sprites as ZIP'
-                        : job.status === 'SUCCESS'
-                          ? 'Download link expired (available for 2 hours after completion)'
-                          : job.status === 'FAILURE'
-                            ? 'Job failed'
-                            : 'Job not finished yet'
-                    }>
-                      <span>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          startIcon={<DownloadIcon />}
-                          disabled={!job.downloadUrl}
-                          href={job.downloadUrl ?? undefined}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          component={job.downloadUrl ? 'a' : 'button'}
-                        >
-                          Download
-                        </Button>
-                      </span>
-                    </Tooltip>
-                  </TableCell>
-                  <TableCell>
-                    {job.preview && (
+                    <Stack direction="row" gap={1} alignItems="center">
                       <Tooltip title={
-                        job.status === 'FAILURE'
-                          ? 'Job failed'
-                          : job.status !== 'SUCCESS'
-                            ? 'Job not finished yet'
-                            : !job.previewAvailable
-                              ? 'Preview expired (available for 2 hours after completion)'
-                              : ''
+                        job.downloadUrl
+                          ? 'Download sprites as ZIP'
+                          : job.status === 'SUCCESS'
+                            ? `Download link expired${job.expiresAt ? ` (expired ${fmt(job.expiresAt)})` : ''}`
+                            : job.status === 'FAILURE'
+                              ? 'Job failed'
+                              : 'Job not finished yet'
                       }>
                         <span>
                           <Button
                             size="small"
                             variant="outlined"
-                            startIcon={<PlayCircleOutlineIcon />}
-                            onClick={() => setPreviewJob(job)}
-                            disabled={!job.previewAvailable}
+                            startIcon={<DownloadIcon />}
+                            disabled={!job.downloadUrl}
+                            href={job.downloadUrl ?? undefined}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            component={job.downloadUrl ? 'a' : 'button'}
                           >
-                            Preview
+                            Download
                           </Button>
                         </span>
                       </Tooltip>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {!TERMINAL_STATUSES.has(job.status) && (
-                      <Tooltip title="Cancel job">
-                        <span>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            color="error"
-                            startIcon={cancellingId === job.id ? <CircularProgress size={14} /> : <CancelIcon />}
-                            onClick={() => handleCancel(job.id)}
-                            disabled={cancellingId === job.id}
-                          >
-                            Cancel
-                          </Button>
-                        </span>
-                      </Tooltip>
-                    )}
+                      {job.preview && (
+                        <Tooltip title={
+                          job.status === 'FAILURE'
+                            ? 'Job failed'
+                            : job.status !== 'SUCCESS'
+                              ? 'Job not finished yet'
+                              : !job.previewAvailable
+                                ? `Preview expired${job.expiresAt ? ` (expired ${fmt(job.expiresAt)})` : ''}`
+                                : ''
+                        }>
+                          <span>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<PlayCircleOutlineIcon />}
+                              onClick={() => setPreviewJob(job)}
+                              disabled={!job.previewAvailable}
+                            >
+                              Preview
+                            </Button>
+                          </span>
+                        </Tooltip>
+                      )}
+                      {!TERMINAL_STATUSES.has(job.status) && (
+                        <Tooltip title="Cancel job">
+                          <span>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="error"
+                              startIcon={cancellingId === job.id ? <CircularProgress size={14} /> : <CancelIcon />}
+                              onClick={() => handleCancel(job.id)}
+                              disabled={cancellingId === job.id}
+                            >
+                              Cancel
+                            </Button>
+                          </span>
+                        </Tooltip>
+                      )}
+                    </Stack>
                   </TableCell>
                 </TableRow>
               ))}

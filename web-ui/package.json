@@ -24,6 +24,9 @@
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.13.1"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": ["@firebase/util", "esbuild", "protobufjs"]
+  },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@types/node": "^24.10.1",

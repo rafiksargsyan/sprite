@@ -77,6 +77,18 @@ public class Config {
   @Value("${job.base-output-folder}")
   public String baseOutputFolder;
 
+  @Value("${job.s3-expiry-seconds:604800}")
+  public long s3ExpirySeconds;
+
+  @Value("${job.retention-seconds:2592000}")
+  public long retentionSeconds;
+
+  @Value("${job.s3-expiry-safety-buffer-seconds:3600}")
+  public long s3ExpirySafetyBufferSeconds;
+
+  @Value("${job.presigned-url-max-seconds:86400}")
+  public long presignedUrlMaxSeconds;
+
   @Bean
   public Queue queue() {
     return new Queue(queueName, true);
@@ -103,12 +115,12 @@ public class Config {
         .build();
   }
 
+  @SuppressWarnings(value = "unused")
   @Bean
   public RabbitTemplate rabbitTemplate(CachingConnectionFactory connectionFactory) {
     connectionFactory.setPublisherConfirmType(CachingConnectionFactory.ConfirmType.CORRELATED);
     RabbitTemplate template = new RabbitTemplate(connectionFactory);
     template.setConfirmCallback((correlationData, ack, cause) -> {
-      if (correlationData == null) return;
       if (ack) {
         thumbnailsGenerationJobRepository.updateMqConfirmedAt(
             TSID.from(correlationData.getId()).toLong(), Instant.now());
@@ -119,6 +131,7 @@ public class Config {
     return template;
   }
 
+  @SuppressWarnings(value = "unused")
   @Bean(destroyMethod = "close")
   public S3Presigner s3Presigner() {
     return S3Presigner.builder()
