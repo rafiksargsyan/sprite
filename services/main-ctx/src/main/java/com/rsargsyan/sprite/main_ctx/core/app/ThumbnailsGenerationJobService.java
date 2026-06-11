@@ -285,15 +285,16 @@ public class ThumbnailsGenerationJobService {
     List<ThumbnailsGenerationJob> stuckJobs = thumbnailsGenerationJobRepository.findStuckJobs(threshold);
     for (ThumbnailsGenerationJob job : stuckJobs) {
       transactionTemplate.executeWithoutResult(status -> {
-        if (job.getRetryCount() >= config.maxRetries) {
-          log.warn("[{}] Job exceeded max retries ({}), marking as FAILURE", job.getStrId(), config.maxRetries);
-          job.fail(FailureReason.UNKNOWN);
-          thumbnailsGenerationJobRepository.save(job);
+        ThumbnailsGenerationJob j = thumbnailsGenerationJobRepository.findById(job.getId()).orElseThrow();
+        if (j.getRetryCount() >= config.maxRetries) {
+          log.warn("[{}] Job exceeded max retries ({}), marking as FAILURE", j.getStrId(), config.maxRetries);
+          j.fail(FailureReason.UNKNOWN);
+          thumbnailsGenerationJobRepository.save(j);
         } else {
-          log.warn("[{}] Retrying stuck job (attempt {})", job.getStrId(), job.getRetryCount() + 1);
-          job.retry();
-          thumbnailsGenerationJobRepository.save(job);
-          applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobRetryEvent(job.getId()));
+          log.warn("[{}] Retrying stuck job (attempt {})", j.getStrId(), j.getRetryCount() + 1);
+          j.retry();
+          thumbnailsGenerationJobRepository.save(j);
+          applicationEventPublisher.publishEvent(new ThumbnailsGenerationJobRetryEvent(j.getId()));
         }
       });
     }
