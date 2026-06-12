@@ -212,16 +212,20 @@ public class ThumbnailsGenerationJobService {
   private void cleanOutputFolder() {
     Path root = Paths.get(config.baseOutputFolder);
     if (!Files.exists(root)) return;
-    Instant cutoff = Instant.now().minus(Duration.ofDays(1));
+    Instant cutoff = Instant.now().minus(Duration.ofDays(2));
     try (var stream = Files.list(root)) {
-      stream.filter(Files::isDirectory).forEach(dir -> {
+      stream.forEach(entry -> {
         try {
-          if (Files.getLastModifiedTime(dir).toInstant().isBefore(cutoff)) {
-            deleteRecursively(dir);
-            log.info("Cleaned up stale output folder: {}", dir.getFileName());
+          if (Files.getLastModifiedTime(entry).toInstant().isBefore(cutoff)) {
+            if (Files.isDirectory(entry)) {
+              deleteRecursively(entry);
+            } else {
+              Files.delete(entry);
+            }
+            log.info("Cleaned up stale output file: {}", entry.getFileName());
           }
         } catch (Exception e) {
-          log.warn("Failed to clean output folder {}: {}", dir.getFileName(), e.getMessage());
+          log.warn("Failed to clean output file {}: {}", entry.getFileName(), e.getMessage());
         }
       });
     } catch (Exception e) {
