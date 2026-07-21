@@ -1,0 +1,123 @@
+databaseChangeLog:
+  - changeSet:
+      id: 001-initial-schema
+      author: rsargsyan
+      changes:
+        - sql:
+            splitStatements: true
+            stripComments: true
+            sql: |
+              CREATE TABLE account (
+                id                    BIGINT       NOT NULL,
+                version               BIGINT       NOT NULL DEFAULT 0,
+                created_at            TIMESTAMPTZ  NOT NULL,
+                updated_at            TIMESTAMPTZ  NOT NULL,
+                local_entity_counter  INTEGER      DEFAULT 0,
+                PRIMARY KEY (id)
+              );
+
+              CREATE TABLE principal (
+                id                    BIGINT       NOT NULL,
+                version               BIGINT       NOT NULL DEFAULT 0,
+                created_at            TIMESTAMPTZ  NOT NULL,
+                updated_at            TIMESTAMPTZ  NOT NULL,
+                local_entity_counter  INTEGER      DEFAULT 0,
+                external_id           VARCHAR(255),
+                full_name             VARCHAR(127),
+                PRIMARY KEY (id)
+              );
+
+              ALTER TABLE principal ADD CONSTRAINT principal_external_id_uk UNIQUE (external_id);
+
+              CREATE TABLE user_profile (
+                id                    BIGINT       NOT NULL,
+                version               BIGINT       NOT NULL DEFAULT 0,
+                created_at            TIMESTAMPTZ  NOT NULL,
+                updated_at            TIMESTAMPTZ  NOT NULL,
+                local_entity_counter  INTEGER      DEFAULT 0,
+                account_id            BIGINT       NOT NULL,
+                principal_id          BIGINT       NOT NULL,
+                full_name             VARCHAR(127) NOT NULL,
+                PRIMARY KEY (id)
+              );
+
+              ALTER TABLE user_profile ADD CONSTRAINT fk_user_profile_account   FOREIGN KEY (account_id)   REFERENCES account (id);
+              ALTER TABLE user_profile ADD CONSTRAINT fk_user_profile_principal  FOREIGN KEY (principal_id) REFERENCES principal (id);
+
+              CREATE TABLE api_key (
+                id                    BIGINT       NOT NULL,
+                version               BIGINT       NOT NULL DEFAULT 0,
+                created_at            TIMESTAMPTZ  NOT NULL,
+                updated_at            TIMESTAMPTZ  NOT NULL,
+                local_entity_counter  INTEGER      DEFAULT 0,
+                account_id            BIGINT       NOT NULL,
+                hashed_key            VARCHAR(255) NOT NULL,
+                user_profile_id       BIGINT       NOT NULL,
+                disabled              BOOLEAN      NOT NULL DEFAULT FALSE,
+                last_access_time      TIMESTAMPTZ,
+                description           VARCHAR(127),
+                PRIMARY KEY (id)
+              );
+
+              ALTER TABLE api_key ADD CONSTRAINT fk_api_key_account       FOREIGN KEY (account_id)      REFERENCES account (id);
+              ALTER TABLE api_key ADD CONSTRAINT fk_api_key_user_profile   FOREIGN KEY (user_profile_id) REFERENCES user_profile (id);
+              ALTER TABLE api_key ADD CONSTRAINT api_key_hashed_key_uk     UNIQUE (hashed_key);
+
+              CREATE TABLE job_spec (
+                id                    BIGINT       NOT NULL,
+                version               BIGINT       NOT NULL DEFAULT 0,
+                created_at            TIMESTAMPTZ  NOT NULL,
+                updated_at            TIMESTAMPTZ  NOT NULL,
+                local_entity_counter  INTEGER      DEFAULT 0,
+                account_id            BIGINT       NOT NULL,
+                name                  VARCHAR(255),
+                description           VARCHAR(255),
+                configs               JSONB,
+                PRIMARY KEY (id)
+              );
+
+              ALTER TABLE job_spec ADD CONSTRAINT fk_job_spec_account           FOREIGN KEY (account_id) REFERENCES account (id);
+              ALTER TABLE job_spec ADD CONSTRAINT job_spec_account_id_name_uk   UNIQUE (account_id, name);
+
+              CREATE TABLE thumbnails_generation_job (
+                id                    BIGINT           NOT NULL,
+                version               BIGINT           NOT NULL DEFAULT 0,
+                created_at            TIMESTAMPTZ      NOT NULL,
+                updated_at            TIMESTAMPTZ      NOT NULL,
+                local_entity_counter  INTEGER          DEFAULT 0,
+                account_id            BIGINT           NOT NULL,
+                url                   TEXT,
+                status                VARCHAR(255)     NOT NULL,
+                job_spec              JSONB,
+                stream_index          INTEGER,
+                preview               BOOLEAN          NOT NULL DEFAULT FALSE,
+                failure_reason        VARCHAR(255),
+                started_at            TIMESTAMPTZ,
+                finished_at           TIMESTAMPTZ,
+                last_heartbeat_at     TIMESTAMPTZ,
+                mq_sent_at            TIMESTAMPTZ,
+                mq_confirmed_at       TIMESTAMPTZ,
+                retry_count           INTEGER          NOT NULL DEFAULT 0,
+                processing_stats      JSONB,
+                cost                  DOUBLE PRECISION,
+                s3_deleted_at         TIMESTAMPTZ,
+                PRIMARY KEY (id)
+              );
+
+              ALTER TABLE thumbnails_generation_job ADD CONSTRAINT fk_thumbnails_generation_job_account FOREIGN KEY (account_id) REFERENCES account (id);
+
+              CREATE TABLE scheduled_tasks (
+                task_name             TEXT         NOT NULL,
+                task_instance         TEXT         NOT NULL,
+                task_data             BYTEA,
+                execution_time        TIMESTAMPTZ  NOT NULL,
+                picked                BOOLEAN      NOT NULL,
+                picked_by             TEXT,
+                last_success          TIMESTAMPTZ,
+                last_failure          TIMESTAMPTZ,
+                consecutive_failures  INTEGER,
+                last_failure_cause    TEXT,
+                last_heartbeat        TIMESTAMPTZ,
+                version               BIGINT       NOT NULL,
+                PRIMARY KEY (task_name, task_instance)
+              );

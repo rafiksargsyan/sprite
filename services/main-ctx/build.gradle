@@ -36,6 +36,7 @@ dependencies {
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6'
 	implementation 'io.trbl:blurhash:1.0.0'
 	implementation 'com.github.kagkarlsson:db-scheduler-spring-boot-starter:15.0.0'
+	implementation 'org.liquibase:liquibase-core'
 }
 
 tasks.named('test') {
