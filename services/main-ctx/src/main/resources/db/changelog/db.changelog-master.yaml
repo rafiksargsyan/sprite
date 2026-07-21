@@ -2,3 +2,6 @@ databaseChangeLog:
   - include:
       file: db/changelog/001-initial-schema.yaml
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/002-fix-s3deleted-at-column.yaml
+      relativeToChangelogFile: false

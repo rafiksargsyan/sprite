@@ -1,0 +1,12 @@
+databaseChangeLog:
+  - changeSet:
+      id: 002-fix-s3deleted-at-column
+      author: rsargsyan
+      preConditions:
+        - onFail: MARK_RAN
+          columnExists:
+            tableName: thumbnails_generation_job
+            columnName: s3_deleted_at
+      changes:
+        - sql:
+            sql: ALTER TABLE thumbnails_generation_job RENAME COLUMN s3_deleted_at TO s3deleted_at;
