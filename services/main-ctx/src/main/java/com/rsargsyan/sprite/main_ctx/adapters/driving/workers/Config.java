@@ -60,9 +60,9 @@ public class Config {
       } catch (UnsupportedEncodingException e) {
         throw new IllegalStateException("This should never happen", e);
       } catch (ResourceNotFoundException e) {
-        log.warn("Job not found", e);
-        ack(channel, message);
-        return;
+        // Propagate: let RabbitMQ requeue and retry, in case the job's DB transaction
+        // hasn't committed yet (publish-before-commit race in ApplicationEventListener).
+        throw e;
       } catch (DomainException e) {
         log.warn("Received a domain exception", e);
         ack(channel, message);
