@@ -60,9 +60,14 @@ public class Config {
       } catch (UnsupportedEncodingException e) {
         throw new IllegalStateException("This should never happen", e);
       } catch (ResourceNotFoundException e) {
-        // Propagate: let RabbitMQ requeue and retry, in case the job's DB transaction
-        // hasn't committed yet (publish-before-commit race in ApplicationEventListener).
-        throw e;
+        // Explicit NACK+requeue (not a rethrow): this container uses AcknowledgeMode.MANUAL,
+        // so an uncaught exception does NOT get auto-nacked by Spring AMQP - it would leave
+        // the message permanently unacknowledged, eventually exhausting the prefetch count
+        // and stalling the whole consumer. Requeueing gives the DB transaction (publish-before-
+        // commit race in ApplicationEventListener) a chance to have committed by redelivery.
+        log.warn("Job not found, requeueing for retry", e);
+        nack(channel, message, true);
+        return;
       } catch (DomainException e) {
         log.warn("Received a domain exception", e);
         ack(channel, message);
@@ -78,6 +83,14 @@ public class Config {
       channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
     } catch (IOException e) {
       log.warn("Failed to ACK message, RabbitMQ will redeliver", e);
+    }
+  }
+
+  private static void nack(Channel channel, Message message, boolean requeue) {
+    try {
+      channel.basicNack(message.getMessageProperties().getDeliveryTag(), false, requeue);
+    } catch (IOException e) {
+      log.warn("Failed to NACK message, RabbitMQ will redeliver on channel/connection loss", e);
     }
   }
 
