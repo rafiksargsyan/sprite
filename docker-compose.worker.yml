@@ -5,6 +5,8 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
       - "minio.local:host-gateway"
+    volumes:
+      - sprite-tmp:/tmp/sprite
     environment:
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-postgres}
@@ -25,3 +27,6 @@ services:
       JOB_MAX_VIDEO_FILE_SIZE_BYTES: ${JOB_MAX_VIDEO_FILE_SIZE_BYTES:-53687091200}  
       JOB_S3_EXPIRY_SECONDS: ${JOB_S3_EXPIRY_SECONDS:-86400}
       JOB_RETENTION_SECONDS: ${JOB_RETENTION_SECONDS:-604800}
+
+volumes:
+  sprite-tmp:
